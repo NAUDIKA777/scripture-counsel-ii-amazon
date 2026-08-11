@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { toast } from "sonner";
-import { Volume2, Pause, Loader2, Quote } from "lucide-react";
+import { Volume2, Pause, Loader2 } from "lucide-react";
+import ScriptureCard from "@/components/ScriptureCard";
 
 const audioBars = [0, 1, 2, 3, 4];
 
@@ -131,21 +132,7 @@ export default function ConversationCard({ convo, api }) {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-8">
             {convo.references.map((r, i) => (
-              <div
-                key={i}
-                data-testid={`scripture-card-${i}`}
-                className="parchment rounded-xl p-6 border gold-border relative overflow-hidden"
-              >
-                <Quote
-                  className="absolute top-4 right-4 w-6 h-6"
-                  style={{ color: "rgba(212,175,55,0.35)" }}
-                  strokeWidth={1.5}
-                />
-                <div className="text-xs uppercase tracking-[0.28em] gold-text mb-3">
-                  {r.book} {r.chapter}:{r.verse}
-                </div>
-                <p className="scripture-text">&ldquo;{r.text}&rdquo;</p>
-              </div>
+              <ScriptureCard key={i} reference={r} index={i} />
             ))}
           </div>
         </div>
