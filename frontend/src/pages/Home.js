@@ -2,10 +2,12 @@ import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, ScrollText, Send, Volume2, Pause, BookOpen, Sparkles, History } from "lucide-react";
+import { Loader2, ScrollText, Send, BookOpen, Sparkles, History, Lock } from "lucide-react";
 import Hero from "@/components/Hero";
 import ConversationCard from "@/components/ConversationCard";
 import VerseOfDay from "@/components/VerseOfDay";
+import Paywall from "@/components/Paywall";
+import { useAccess } from "@/hooks/useAccess";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -26,7 +28,11 @@ export default function Home() {
   const [conversations, setConversations] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [sessionId] = useState(getOrCreateSession);
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const [paywallReason, setPaywallReason] = useState("limit");
   const answersRef = useRef(null);
+
+  const access = useAccess();
 
   useEffect(() => {
     axios.get(`${API}/suggestions`)
@@ -43,11 +49,18 @@ export default function Home() {
       toast.error("Please share what weighs on your heart.");
       return;
     }
+    // Gate: if free counsels are exhausted and no active subscription, show paywall
+    if (!access.canAsk) {
+      setPaywallReason("limit");
+      setPaywallOpen(true);
+      return;
+    }
     setLoading(true);
     try {
       const res = await axios.post(`${API}/ask`, { question: q, session_id: sessionId });
       setConversations((c) => [...c, res.data]);
       setQuestion("");
+      if (!access.isPro) access.recordFreeUse();
       setTimeout(() => {
         answersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 100);
@@ -64,6 +77,12 @@ export default function Home() {
     window.location.reload();
   };
 
+  const onUnlock = () => {
+    setPaywallOpen(false);
+    void access.refresh();
+    toast.success("Access unlocked.");
+  };
+
   return (
     <div className="relative min-h-screen text-slate-100" data-testid="home-page">
       {/* NAV */}
@@ -76,14 +95,42 @@ export default function Home() {
               <div className="text-[10px] uppercase tracking-[0.25em] text-slate-400">Counsel from Scripture · KJV</div>
             </div>
           </div>
-          <button
-            onClick={clearSession}
-            data-testid="new-session-btn"
-            className="text-xs uppercase tracking-widest text-slate-400 hover:text-amber-200 flex items-center gap-2"
-          >
-            <History className="w-3.5 h-3.5" strokeWidth={1.5} />
-            New Session
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Access pill */}
+            {!access.loading && (
+              access.isPro ? (
+                <span
+                  className="hidden sm:inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] uppercase tracking-widest border"
+                  style={{ borderColor: "rgba(212,175,55,0.5)", color: "var(--gold)" }}
+                  data-testid="access-pill-pro"
+                >
+                  <Sparkles className="w-3 h-3" strokeWidth={2} />
+                  Pro
+                </span>
+              ) : (
+                <button
+                  onClick={() => { setPaywallReason("upgrade"); setPaywallOpen(true); }}
+                  data-testid="access-pill-free"
+                  className="hidden sm:inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] uppercase tracking-widest border border-white/15 text-slate-300 hover:border-amber-300/60 hover:text-amber-100"
+                  title="Upgrade to Pro"
+                >
+                  {access.freeRemaining > 0 ? (
+                    <>· {access.freeRemaining} free {access.freeRemaining === 1 ? "counsel" : "counsels"} left ·</>
+                  ) : (
+                    <><Lock className="w-3 h-3" strokeWidth={2} /> Upgrade</>
+                  )}
+                </button>
+              )
+            )}
+            <button
+              onClick={clearSession}
+              data-testid="new-session-btn"
+              className="text-xs uppercase tracking-widest text-slate-400 hover:text-amber-200 flex items-center gap-2"
+            >
+              <History className="w-3.5 h-3.5" strokeWidth={1.5} />
+              New Session
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -127,7 +174,6 @@ export default function Home() {
           </section>
         )}
 
-        {/* Empty state helper */}
         {conversations.length === 0 && (
           <div className="mt-16 text-center text-slate-400" data-testid="empty-state">
             <BookOpen className="w-6 h-6 mx-auto mb-3 opacity-60" strokeWidth={1.5} />
@@ -147,7 +193,7 @@ export default function Home() {
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !loading && submit()}
-              placeholder="Ask another question..."
+              placeholder={access.mustPay ? "Subscribe to continue asking..." : "Ask another question..."}
               data-testid="followup-input"
               className="flex-1 bg-transparent outline-none text-slate-100 placeholder:text-slate-500 py-2"
             />
@@ -158,8 +204,14 @@ export default function Home() {
               className="inline-flex items-center gap-2 rounded-full px-5 py-2 font-medium text-slate-950 disabled:opacity-50"
               style={{ backgroundColor: "var(--gold)" }}
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" strokeWidth={2} />}
-              <span className="text-sm">Ask</span>
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : access.mustPay ? (
+                <Lock className="w-4 h-4" strokeWidth={2} />
+              ) : (
+                <Send className="w-4 h-4" strokeWidth={2} />
+              )}
+              <span className="text-sm">{access.mustPay ? "Unlock" : "Ask"}</span>
             </button>
           </div>
         </div>
@@ -169,6 +221,13 @@ export default function Home() {
         <Sparkles className="inline w-3 h-3 mr-2 -mt-0.5" style={{ color: "var(--gold)" }} strokeWidth={1.5} />
         Counsel drawn from the Holy Bible · King James Version
       </footer>
+
+      <Paywall
+        open={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        onUnlock={onUnlock}
+        reason={paywallReason}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -9,8 +9,9 @@ import json
 import base64
 import logging
 import random
+import httpx
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
 import uuid
 from datetime import datetime, timezone
@@ -28,6 +29,9 @@ db = mongo_client[os.environ['DB_NAME']]
 
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 ELEVENLABS_API_KEY = os.environ.get('ELEVENLABS_API_KEY', '').strip()
+REVENUECAT_SECRET_KEY = os.environ.get('REVENUECAT_SECRET_KEY', '').strip()
+REVENUECAT_WEBHOOK_SECRET = os.environ.get('REVENUECAT_WEBHOOK_SECRET', '').strip()
+REVENUECAT_ENTITLEMENT_ID = os.environ.get('REVENUECAT_ENTITLEMENT_ID', 'pro').strip()
 
 # Kind Statesman voice - "Daniel" (deep, warm, authoritative British)
 STATESMAN_VOICE_ID = "onwK4e9ZLuTAKqWW03F9"
@@ -65,6 +69,15 @@ class AskResponse(BaseModel):
 
 class TTSRequest(BaseModel):
     text: str
+
+
+class RegisterEmailRequest(BaseModel):
+    app_user_id: str
+    email: EmailStr
+
+
+class RestoreRequest(BaseModel):
+    email: EmailStr
 
 
 class Conversation(BaseModel):
@@ -180,6 +193,7 @@ async def health():
         "status": "ok",
         "llm_configured": bool(EMERGENT_LLM_KEY),
         "voice_configured": bool(ELEVENLABS_API_KEY),
+        "payments_configured": bool(REVENUECAT_SECRET_KEY),
     }
 
 
@@ -271,6 +285,116 @@ async def tts(req: TTSRequest):
         raise HTTPException(status_code=502, detail=f"TTS generation failed: {e}")
 
     return Response(content=audio_bytes, media_type="audio/mpeg")
+
+
+@api_router.post("/subscription/register-email")
+async def register_email(req: RegisterEmailRequest):
+    """Associate an email with a RevenueCat app_user_id so the user can later
+    restore access from another browser."""
+    email = req.email.lower().strip()
+    doc = {
+        "email": email,
+        "app_user_id": req.app_user_id.strip(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.subscription_emails.update_one(
+        {"email": email},
+        {"$set": doc},
+        upsert=True,
+    )
+    return {"ok": True}
+
+
+async def _rc_lookup_pro_active(app_user_id: str) -> bool:
+    """Ask RevenueCat's REST API whether the given app_user_id has an active
+    'pro' entitlement. Returns False when the secret key is not configured."""
+    if not REVENUECAT_SECRET_KEY:
+        return False
+    url = f"https://api.revenuecat.com/v1/subscribers/{app_user_id}"
+    try:
+        async with httpx.AsyncClient(timeout=10) as http:
+            r = await http.get(
+                url,
+                headers={
+                    "Authorization": f"Bearer {REVENUECAT_SECRET_KEY}",
+                    "Content-Type": "application/json",
+                },
+            )
+        if r.status_code != 200:
+            return False
+        data = r.json()
+        ent = data.get("subscriber", {}).get("entitlements", {}).get(REVENUECAT_ENTITLEMENT_ID)
+        if not ent:
+            return False
+        expires = ent.get("expires_date")
+        if not expires:
+            return True
+        try:
+            exp_dt = datetime.fromisoformat(expires.replace("Z", "+00:00"))
+            return exp_dt > datetime.now(timezone.utc)
+        except Exception:
+            return True
+    except Exception as e:
+        logger.warning(f"RevenueCat lookup failed: {e}")
+        return False
+
+
+@api_router.post("/subscription/restore")
+async def restore(req: RestoreRequest):
+    """Look up the app_user_id previously registered with this email and
+    verify whether the subscription is still active with RevenueCat."""
+    email = req.email.lower().strip()
+    doc = await db.subscription_emails.find_one({"email": email}, {"_id": 0})
+    if not doc:
+        return {"app_user_id": None, "pro_active": False, "found": False}
+
+    app_user_id = doc.get("app_user_id")
+    pro_active = await _rc_lookup_pro_active(app_user_id) if app_user_id else False
+
+    # Also mirror status locally
+    if app_user_id:
+        await db.subscriptions.update_one(
+            {"app_user_id": app_user_id},
+            {"$set": {
+                "app_user_id": app_user_id,
+                "email": email,
+                "pro_active": pro_active,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }},
+            upsert=True,
+        )
+
+    return {"app_user_id": app_user_id, "pro_active": pro_active, "found": True}
+
+
+@api_router.post("/webhooks/revenuecat")
+async def revenuecat_webhook(request: Request):
+    """Optional: called by RevenueCat when subscription lifecycle events occur.
+    Requires REVENUECAT_WEBHOOK_SECRET to be set and sent in the Authorization header."""
+    if not REVENUECAT_WEBHOOK_SECRET:
+        raise HTTPException(status_code=503, detail="Webhook not configured")
+    auth = request.headers.get("authorization", "")
+    if auth != REVENUECAT_WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Invalid webhook authorization")
+
+    payload = await request.json()
+    event = payload.get("event", {})
+    app_user_id = event.get("app_user_id")
+    if not app_user_id:
+        return {"ok": True}
+
+    pro_active = await _rc_lookup_pro_active(app_user_id)
+    await db.subscriptions.update_one(
+        {"app_user_id": app_user_id},
+        {"$set": {
+            "app_user_id": app_user_id,
+            "pro_active": pro_active,
+            "last_event": event.get("type"),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+    return {"ok": True}
 
 
 app.include_router(api_router)
