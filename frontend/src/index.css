@@ -1,0 +1,154 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Manrope:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --bg-obsidian: #030712;
+    --bg-slate: #0f172a;
+    --bg-slate-2: #111827;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-scripture: #fde68a;
+    --gold: #d4af37;
+    --gold-hover: #fef08a;
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.18);
+}
+
+@layer base {
+    :root {
+        --background: 222 47% 4%;
+        --foreground: 210 40% 98%;
+        --card: 222 47% 8%;
+        --card-foreground: 210 40% 98%;
+        --popover: 222 47% 8%;
+        --popover-foreground: 210 40% 98%;
+        --primary: 45 62% 52%;
+        --primary-foreground: 222 47% 6%;
+        --secondary: 217 33% 17%;
+        --secondary-foreground: 210 40% 98%;
+        --muted: 217 33% 14%;
+        --muted-foreground: 215 20% 65%;
+        --accent: 45 62% 52%;
+        --accent-foreground: 222 47% 6%;
+        --destructive: 0 63% 40%;
+        --destructive-foreground: 210 40% 98%;
+        --border: 217 33% 17%;
+        --input: 217 33% 17%;
+        --ring: 45 62% 52%;
+        --radius: 0.75rem;
+    }
+    * {
+        @apply border-border;
+    }
+    body {
+        margin: 0;
+        background-color: var(--bg-obsidian);
+        color: var(--text-primary);
+        font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+    h1, h2, h3, h4, .font-serif {
+        font-family: 'Cormorant Garamond', ui-serif, Georgia, serif;
+    }
+}
+
+/* subtle grain overlay */
+.grain::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.04 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    opacity: 0.6;
+    mix-blend-mode: overlay;
+}
+
+.hero-image {
+    background-image:
+        linear-gradient(180deg, rgba(3,7,18,0.55) 0%, rgba(3,7,18,0.85) 60%, rgba(3,7,18,1) 100%),
+        url("https://images.unsplash.com/photo-1454105511235-eda89ad84214?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjV8MHwxfHNlYXJjaHwyfHxzZXJlbmUlMjBmb2dneSUyMG1vdW50YWluJTIwbGFuZHNjYXBlfGVufDB8fHx8MTc4NjQxMDMyN3ww&ixlib=rb-4.1.0&q=85");
+    background-size: cover;
+    background-position: center;
+}
+
+.parchment {
+    background-image:
+        linear-gradient(180deg, rgba(15,23,42,0.85) 0%, rgba(15,23,42,0.95) 100%),
+        url("https://images.unsplash.com/photo-1706790608211-4c03fd4f4d33?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzF8MHwxfHNlYXJjaHwyfHxhbmNpZW50JTIwcGFyY2htZW50JTIwcGFwZXIlMjB0ZXh0dXJlfGVufDB8fHx8MTc4NjQxMDMyNnww&ixlib=rb-4.1.0&q=85");
+    background-size: cover;
+    background-position: center;
+    background-blend-mode: multiply;
+}
+
+.glass {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--border-subtle);
+}
+
+.glass-strong {
+    background: rgba(15, 23, 42, 0.7);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--border-strong);
+}
+
+.gold-text {
+    color: var(--gold);
+}
+
+.gold-border {
+    border-color: rgba(212, 175, 55, 0.4);
+}
+
+.answer-body {
+    font-family: 'Manrope', sans-serif;
+    font-size: 1.125rem;
+    line-height: 1.85;
+    color: #e2e8f0;
+}
+
+.scripture-text {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    color: var(--text-scripture);
+    font-size: 1.125rem;
+    line-height: 1.7;
+}
+
+/* Fade + rise in */
+@keyframes riseIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.rise-in { animation: riseIn 0.7s ease-out both; }
+
+/* subtle audio bars */
+@keyframes bar {
+    0%, 100% { transform: scaleY(0.35); }
+    50%      { transform: scaleY(1); }
+}
+.audio-bar { animation: bar 0.9s ease-in-out infinite; transform-origin: bottom; }
+
+/* focus rings */
+button:focus-visible, input:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 3px;
+}
+
+/* input transitions */
+input, textarea, button {
+    transition-property: background-color, border-color, color, box-shadow;
+    transition-duration: 200ms;
+    transition-timing-function: ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .rise-in, .audio-bar { animation: none; }
+}

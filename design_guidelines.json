@@ -1,0 +1,105 @@
+{
+  "theme_strategy": {
+    "theme": "Dark Mode (Monastic Modernism)",
+    "rationale": "A deep, contemplative dark theme using midnight slate and aged gold accents. This creates a reverent, intimate, and calm environment suitable for spiritual counsel and biblical wisdom.",
+    "archetype": "ARCHETYPE 5: LUXURY (Premium, Depth, Mystery) blended with classic editorial. Use high contrast, rich textures, and no generic full-screen gradients."
+  },
+  "typography": {
+    "headings": {
+      "family": "Cormorant Garamond, serif",
+      "usage": "All H1, H2, H3, and major quotes. Delivers a timeless, biblical, statesman-like weight. NEVER use Inter for headings.",
+      "styles": "tracking-tight, font-medium to font-bold. E.g., text-5xl tracking-tight text-slate-50."
+    },
+    "body": {
+      "family": "Manrope, sans-serif",
+      "usage": "Chat text, UI labels, buttons. Clean, highly legible, humanist sans to balance the heavy serif.",
+      "styles": "leading-relaxed, text-base to text-lg. Use text-slate-300 for general reading."
+    },
+    "scripture": {
+      "family": "Cormorant Garamond, serif",
+      "usage": "Use italicized serif for the actual KJV scripture verses to visually differentiate ancient text from the AI's conversational counsel."
+    }
+  },
+  "colors": {
+    "background": {
+      "main": "#030712",
+      "surface": "#0f172a",
+      "glass": "rgba(255, 255, 255, 0.03)",
+      "notes": "Never use pure #000000. Rely on deep slate/obsidian."
+    },
+    "text": {
+      "primary": "#f8fafc",
+      "secondary": "#94a3b8",
+      "scripture": "#fde68a"
+    },
+    "accent": {
+      "primary": "#d4af37",
+      "primary_hover": "#fef08a",
+      "subtle_border": "rgba(255, 255, 255, 0.1)"
+    }
+  },
+  "layouts": {
+    "general": "Mobile-first, generous spacing (p-8 to p-12 minimum). Containers with borders must have internal padding.",
+    "hero_section": "High visual impact. Use the serene foggy mountain image with a heavy bg-black/60 overlay so text is highly legible. The 'Ask' input should be massive and centrally focused, using Crystal Glassmorphism (backdrop-blur-xl, bg-white/5, 1px border-white/20).",
+    "chat_interface": "Break the generic 'chat bubble' pattern. User messages can be subtle pills aligned right. AI answers should NOT be in bubbles; they should flow like an elegant editorial article, left-aligned, perhaps with a 2px gold border-l. Keep max-w-3xl for optimal reading length.",
+    "scripture_cards": "Bento-style layout for references. Displayed elegantly alongside or underneath the specific point in the answer. Use a subtle warm/parchment background tint (or solid #0f172a with a gold border) to make them stand out as authoritative knowledge."
+  },
+  "component_instructions": {
+    "audio_player": "Audio playback (Statesman voice) must be a sleek, prominent button next to the AI response. Use a rounded-full button with a play icon and an accompanying subtle audio waveform animation when playing.",
+    "suggested_prompts": "Render as elegant, pill-shaped buttons below the main input. Use transparent backgrounds with 1px border-white/20 and hover:bg-white/10 hover:text-white transitions.",
+    "navigation": "Sticky nav using Crystal Glass (backdrop-blur-xl bg-black/60). Must include the Brand/Logo (e.g., 'Wisdom & Word') and session history/recent questions toggle.",
+    "buttons": "Primary CTA should use the Accent Gold (#d4af37) with dark text (#030712) for high contrast. Hover state should lighten to #fef08a."
+  },
+  "motion_and_interactions": {
+    "general": "Smooth, reverent animations. Nothing fast or bouncy.",
+    "chat_reveal": "Use staggered fade-ins (opacity 0 to 1, y: 10 to 0) for new messages and scripture cards using Framer Motion.",
+    "hover_states": "All interactive elements must explicitly set text color on hover. Focus states must have a 2px ring of gold/amber."
+  },
+  "accessibility": {
+    "contrast": "Ensure text meets APCA standards. White/gold text on deep slate backgrounds. Use text-shadow if placing text over any varied background.",
+    "testing": "All interactive elements (inputs, buttons, prompt pills) MUST include a data-testid attribute (e.g., data-testid='ask-input', data-testid='play-audio-button').",
+    "motion": "Respect prefers-reduced-motion media queries."
+  },
+  "image_urls": {
+    "hero_backgrounds": [
+      {
+        "url": "https://images.unsplash.com/photo-1454105511235-eda89ad84214?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjV8MHwxfHNlYXJjaHwyfHxzZXJlbmUlMjBmb2dneSUyMG1vdW50YWluJTIwbGFuZHNjYXBlfGVufDB8fHx8MTc4NjQxMDMyN3ww&ixlib=rb-4.1.0&q=85",
+        "category": "Hero Section",
+        "description": "Serene foggy mountain landscape (trees field with fogs) - Use as a full-bleed background for the hero/landing area with a dark overlay."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1474540412665-1cdae210ae6b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w7NTY2Njd8MHwxfHNlYXJjaHwxfHxjYWxtJTIwb2NlYW4lMjBzdW5zZXQlMjBtaW5pbWFsaXN0fGVufDB8fHx8MTc4NjQxMDMyNnww&ixlib=rb-4.1.0&q=85",
+        "category": "Alternative Hero/Chat Background",
+        "description": "Calm ocean sunset minimalist - Can be used as a subtle, heavily darkened background texture for the chat session area."
+      }
+    ],
+    "textures": [
+      {
+        "url": "https://images.unsplash.com/photo-1706790608211-4c03fd4f4d33?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzF8MHwxfHNlYXJjaHwyfHxhbmNpZW50JTIwcGFyY2htZW50JTIwcGFwZXIlMjB0ZXh0dXJlfGVufDB8fHx8MTc4NjQxMDMyNnww&ixlib=rb-4.1.0&q=85",
+        "category": "Scripture Card Texture",
+        "description": "Ancient parchment texture - Use as a subtle background image (with high opacity overlay or blend-mode) on Scripture Reference cards to evoke an ancient Bible feel."
+      }
+    ]
+  },
+  "instructions_to_main_agent": {
+    "frameworks": "Use React, Tailwind CSS, and Shadcn UI primitives (.js format).",
+    "fonts": "Import Cormorant Garamond and Manrope from Google Fonts in index.css or via next/font if applicable. Apply Cormorant Garamond to headings and Manrope to sans-serif classes.",
+    "icons": "Use lucide-react. Standardize stroke-width to 1.5 for elegance.",
+    "state_management": "Maintain a robust chat history state that pairs the user's question with the AI's response, the cited scripture (book, chapter, verse, text), and an audio playback state."
+  },
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. In frontend design, this creates the 'AI slop' aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy and glass-morphism effects with backdrop filters (12-24px blur).",
+    "You MUST NOT apply universal transition (e.g., transition: all). Always add transitions for specific interactive elements like button, input excluding transforms.",
+    "You MUST NOT center align the app container. Do not add text-align: center to the root app class. This disrupts the human natural reading flow.",
+    "Always use modern button styles (pill-shaped or sharp) with interaction animations & color relevant to the app style.",
+    "NEVER use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 etc for icons. Use lucide-react icons instead.",
+    "Every interaction needs micro-animations - hover states, transitions, and entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Prioritize using pre-existing components from src/components/ui when applicable.",
+    "Use 'sonner' for toasts if notifications are needed.",
+    "DO NOT use complete transparent background in header, overlays, any surface that has content under it. Example: Dropdown with transparent background is forbidden."
+  ]
+}

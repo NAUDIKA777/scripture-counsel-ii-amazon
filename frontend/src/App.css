@@ -1,0 +1,5 @@
+/* App-specific styles kept minimal; base styling lives in index.css */
+.App {
+    min-height: 100vh;
+    position: relative;
+}

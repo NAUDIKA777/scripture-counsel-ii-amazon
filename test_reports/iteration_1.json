@@ -1,0 +1,23 @@
+{
+  "summary": "First-pass smoke test of Wisdom & Word app. All backend endpoints (health, verse-of-day, suggestions, ask, history, tts, ask-empty) behave as expected. Frontend home renders with brand, hero, ask input, 6 suggestion pills, verse-of-day. Clicking suggestion-0 successfully invokes /api/ask, renders conversation-card with user-question, counsel-answer (192 words, references 4 Bible books), scripture-references (scripture-card-0 present). Listen button triggers 503 and shows a Sonner toast 'Voice not configured. Add ELEVENLABS_API_KEY to enable the statesman voice.' — page does not crash.",
+  "tested_scope": ["frontend", "backend", "integration"],
+  "passed": [
+    "GET /api/health -> 200 {status:ok, llm_configured:true, voice_configured:false}",
+    "GET /api/verse-of-day -> 200 KJV verse (Psalm 46:1) with book/chapter/verse/text",
+    "GET /api/suggestions -> 200 with 6 prompts",
+    "POST /api/ask valid question -> 200, id/session_id/question/answer/references/created_at present; answer 192 words; 5 references (Philippians, Psalm x2, Matthew x2)",
+    "GET /api/history/{session_id} -> 200 returns 1 persisted item matching the question",
+    "POST /api/ask empty question -> 400 {detail:'Question is required'}",
+    "POST /api/tts (no ELEVENLABS key) -> 503 with clear 'Voice not configured...' detail",
+    "Frontend: home-page, brand-logo, hero-section, ask-input, ask-submit-button, suggestion-pills, verse-of-day all rendered",
+    "Hero heading 'Bring what troubles you. Receive ancient counsel.' present",
+    "Suggestion-0 click -> conversation-card, user-question, counsel-answer, scripture-references, scripture-card-0, play-audio-button all present",
+    "Listen (play-audio-button) click -> visible error toast, no crash, conversation-card still healthy"
+  ],
+  "failed": [],
+  "action_items": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "retest_needed": false,
+  "full_testing_deferred": true,
+  "notes": "ELEVENLABS_API_KEY intentionally empty; graceful 503 + frontend toast verified. Test credentials file not needed (no auth in app)."
+}
