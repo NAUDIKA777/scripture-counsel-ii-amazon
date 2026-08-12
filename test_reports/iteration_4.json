@@ -1,0 +1,48 @@
+{
+  "summary": "Retested the RevenueCat sandbox purchase → unlock flow after the user reported attaching the 'pro' entitlement to the monthly product in the RC dashboard. Result: behaviour is IDENTICAL to iteration_3 — the 'Test valid purchase' still hits Path B (receipt_only). The paywall stays open, no access-pill-pro appears, and the 10-second error toast 'The purchase was received, but access has not activated yet. This usually means the site's subscription product is not linked to the pro entitlement in RevenueCat. Please contact support.' is displayed. This means the dashboard mapping is STILL not effective from the SDK's point of view: `customerInfo.entitlements.active['pro']` is empty even after 5×1s retries following a successful RC Test Store purchase. TEST 2 (failed purchase regression) PASSES: paywall stays open, no pro pill, RC SDK log confirms 'Purchase failure simulated successfully in Test Store.' TEST 3 (Pro-only features: unlimited questions / audio / share PNG) could NOT be exercised because unlock never happened.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "RevenueCat sandbox purchase → entitlement unlock (Path A)",
+        "issue": "After a successful RC 'Test valid purchase', calls to Purchases.getCustomerInfo() do NOT return the 'pro' entitlement in entitlements.active — even after the 5×1s retry loop in purchaseMonthly(). Code path always resolves to { status: 'receipt_only' }. Since iteration_3 is byte-identical in behaviour to iteration_4, the RC dashboard configuration the user believes they applied is not actually taking effect. This is a RevenueCat dashboard / product setup issue, not a code issue. Root cause is one of: (a) the entitlement was attached to the WRONG product (e.g. the sandbox 'Test Store' product uses a DIFFERENT identifier than the live monthly product the user edited), (b) the entitlement identifier in the dashboard is NOT literally 'pro' (case sensitive — matches REACT_APP_REVENUECAT_ENTITLEMENT_ID), (c) the offering the SDK is using has no package linked to the entitlement, or (d) the change was saved but a required 'attach to offering' / publish step was skipped.",
+        "affected_selectors": ["[data-testid=paywall-modal]", "[data-testid=access-pill-pro]", "[data-testid=paywall-subscribe]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_results": {
+    "T1_valid_purchase_should_unlock": "FAIL (dashboard config, not code) — paywall stayed open, no access-pill-pro, received the 'receipt_only' error toast. RC SDK log confirms: '[Test store] Performing test purchase.' → purchase completed at RC, but entitlement never became active for the anon appUserId. Sub-steps 8, 9, 10 (immediate ask without paywall / pro persists across reload) could not be verified.",
+    "T2_failed_purchase_regression": "PASS — paywall stays open, no access-pill-pro. Console shows '[Test store] Purchase failure simulated successfully in Test Store.' No misleading receipt_only toast. Note: SDK toast 'Purchase failure simulated successfully in Test Store.' is emitted by the RC SDK itself, not our app — this is expected sandbox behaviour.",
+    "T3_pro_features": "BLOCKED — could not test unlimited questions / play-audio-button / share-verse / download-verse because the user session never reached Pro state."
+  },
+  "diagnostic_evidence": {
+    "anon_app_user_id_seen_in_events": "anon-ea8d6db6-0df9-4b5d-8018-e7796f5ee23... and anon-10088d40-7f42-4e67-941b-04bef25376d2 (fresh IDs per localStorage.clear)",
+    "purchase_toast_after_test_valid": "The purchase was received, but access has not activated yet. This usually means the site's subscription product is not linked to the 'pro' entitlement in RevenueCat. Please contact support.",
+    "rc_sdk_log_key_lines": [
+      "[Purchases] Initializing Purchases SDK with RC Test store API Key.",
+      "[Purchases] [Test store] Performing test purchase. This purchase won't appear in production.",
+      "warning: [Purchases] Branding info is not available for RC Test Store API keys."
+    ],
+    "entitlement_id_configured": "pro (from REACT_APP_REVENUECAT_ENTITLEMENT_ID or default in /app/frontend/src/lib/revenuecat.js line 16)"
+  },
+  "test_report_links": [],
+  "action_items": [
+    "USER ACTION REQUIRED (not a code fix): The RC dashboard mapping is still not taking effect. Ask the user to verify EACH of the following in the RevenueCat dashboard for THIS project's Test Store API key: (1) the Entitlement identifier is literally 'pro' (all lowercase, no whitespace). If it is 'Pro' or 'PRO' or 'pro_monthly', either rename it in RC OR update REACT_APP_REVENUECAT_ENTITLEMENT_ID in /app/frontend/.env to match exactly. (2) Under Products, the monthly product ($4.99/mo) must have the 'pro' entitlement attached (not just the offering). (3) Under Offerings → current offering → the monthly PACKAGE must be attached to that product. (4) The changes must be SAVED/published — some RC screens have a separate Save button per section. (5) Since this is the Test Store, ensure the entitlement mapping is applied in the SAME project whose Test Store API key is used in REACT_APP_REVENUECAT_WEB_PUBLIC_KEY (not a different project). A quick way to verify from OUR side once the user says it's fixed: reload the app, open dev-tools console, run: `(await (await import('@revenuecat/purchases-js')).Purchases.getSharedInstance().getCustomerInfo()).entitlements` — after a Test valid purchase this should show `active: { pro: {...} }`. Today it shows `active: {}`.",
+    "Optional code enhancement (low priority): add a hidden debug log in purchaseMonthly() that prints the full customerInfo.entitlements object right before returning receipt_only, so future diagnosis is faster."
+  ],
+  "critical_code_review_comments": [
+    "Frontend code is CORRECT. purchaseMonthly() retry loop, Paywall.handleSubscribe branches, useAccess.refresh(), and Home.onUnlock all work as designed — verified in iteration_3 and confirmed unchanged here.",
+    "The 'else' branch in Paywall.handleSubscribe (line 50-52, 'Purchase did not complete.') is unreachable dead code — safe to remove.",
+    "Consider adding console.debug of the full entitlements payload on receipt_only for faster future diagnosis of dashboard misconfig."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only)", "frontend": "50% — Test 2 regression PASS; Test 1 unlock FAIL due to RC dashboard config; Test 3 BLOCKED by Test 1"},
+  "test_credentials": "N/A — RC Test Store dialog, no credentials required",
+  "seed_data_creation": "localStorage.setItem('wisdom_free_counsel_count','3') before each test to trigger paywall",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Iteration_4 confirms the code path is unchanged from iteration_3 — user still gets Path B (receipt_only) despite claiming to have attached the 'pro' entitlement. Do NOT re-attempt code fixes; this is a dashboard mapping issue on the user's RevenueCat account. Next testing agent should ONLY re-run TEST 1 after the user provides fresh confirmation of the dashboard state (screenshot of entitlement + product + offering attachment). If Path A works, then also run TEST 3 (play-audio-button, share-verse-0, download-verse-0). The RC Test Store dialog buttons are 'Test valid purchase' and 'Test failed purchase' — reachable via page.click(\"button:has-text('Test valid purchase')\"). Wait ~12-14s after clicking for the 5×1s retry loop.",
+  "rca_of_the_issue": "The purchase itself succeeds inside RC (SDK log: '[Test store] Performing test purchase.' followed by no error), but subsequent getCustomerInfo() calls return an empty entitlements.active object even after 5 retries at 1s each — which means either the entitlement identifier in the dashboard does not match 'pro' exactly, or the monthly product / offering / package is not actually linked to the entitlement. The frontend now surfaces this clearly to the user with the 10-second error toast; the underlying fix is user-side (RC dashboard) — the code is behaving correctly."
+}

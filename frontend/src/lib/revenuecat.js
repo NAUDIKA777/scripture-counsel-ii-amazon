@@ -102,7 +102,9 @@ export async function checkProEntitlement() {
     const p = await getPurchases();
     if (!p) return false;
     const { info } = await fetchCustomerInfoWithRetry(p, 2, 500);
-    return Boolean(info?.entitlements?.active?.[ENTITLEMENT_ID]);
+    const active = info?.entitlements?.active || {};
+    // Exact match on configured id, OR any active entitlement (single-tier app — safe fallback)
+    return Boolean(active[ENTITLEMENT_ID]) || Object.keys(active).length > 0;
   } catch (e) {
     console.warn("Entitlement check failed:", e);
     return false;
@@ -119,8 +121,9 @@ export async function fetchMonthlyPackage() {
 /**
  * Purchase outcome:
  *   { status: "unlocked" }              — entitlement is active
- *   { status: "receipt_only" }          — purchase succeeded at RC but entitlement never
- *                                          activated (usually a dashboard mapping issue)
+ *   { status: "receipt_only", ...diag } — purchase succeeded at RC but entitlement never
+ *                                          activated. `entitlementIds` lists whatever IS active
+ *                                          so a mismatched identifier can be spotted.
  *   throws                              — purchase itself failed / was cancelled
  */
 export async function purchaseMonthly() {
@@ -131,7 +134,10 @@ export async function purchaseMonthly() {
   const result = await p.purchase({ rcPackage: pkg });
 
   // Immediate check
-  let active = Boolean(result?.customerInfo?.entitlements?.active?.[ENTITLEMENT_ID]);
+  let latestInfo = result?.customerInfo || null;
+  const hasAny = (info) => Object.keys(info?.entitlements?.active || {}).length > 0;
+  let active =
+    Boolean(latestInfo?.entitlements?.active?.[ENTITLEMENT_ID]) || hasAny(latestInfo);
 
   // If not immediately active, retry a handful of times to account for RC eventual consistency
   if (!active) {
@@ -139,12 +145,28 @@ export async function purchaseMonthly() {
       await new Promise((r) => setTimeout(r, 1000));
       try {
         const info = await p.getCustomerInfo();
-        active = Boolean(info?.entitlements?.active?.[ENTITLEMENT_ID]);
+        latestInfo = info || latestInfo;
+        active = Boolean(info?.entitlements?.active?.[ENTITLEMENT_ID]) || hasAny(info);
       } catch (e) {
         console.warn(`Entitlement recheck ${i + 1} failed:`, e);
       }
     }
   }
 
-  return { status: active ? "unlocked" : "receipt_only" };
+  if (active) return { status: "unlocked" };
+
+  const entitlementIds = Object.keys(latestInfo?.entitlements?.active || {});
+  const allEntitlementIds = Object.keys(latestInfo?.entitlements?.all || {});
+  console.debug("[RC] receipt_only diagnostic", {
+    expected: ENTITLEMENT_ID,
+    active_entitlements: entitlementIds,
+    all_entitlements: allEntitlementIds,
+    customerInfo: latestInfo,
+  });
+  return {
+    status: "receipt_only",
+    expectedEntitlementId: ENTITLEMENT_ID,
+    activeEntitlementIds: entitlementIds,
+    allEntitlementIds: allEntitlementIds,
+  };
 }

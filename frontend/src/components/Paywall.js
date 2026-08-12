@@ -43,10 +43,21 @@ export default function Paywall({ open, onClose, onUnlock, reason }) {
         toast.success("Welcome — the Elder's counsel is now unlimited to you.");
         onUnlock?.();
       } else if (result?.status === "receipt_only") {
-        toast.error(
-          "The purchase was received, but access has not activated yet. This usually means the site's subscription product is not linked to the 'pro' entitlement in RevenueCat. Please contact support.",
-          { duration: 10000 }
-        );
+        const activeIds = result.activeEntitlementIds || [];
+        const expected = result.expectedEntitlementId;
+        if (activeIds.length > 0) {
+          // RC granted SOME entitlement — just not the exact identifier we expected.
+          // Show a super-clear diagnostic so a case/name mismatch is obvious.
+          toast.error(
+            `Purchase received. Entitlement returned: "${activeIds.join('", "')}" but the app expects "${expected}". Ask the site owner to align the identifier.`,
+            { duration: 15000 }
+          );
+        } else {
+          toast.error(
+            "Purchase received but no entitlement was granted. The site's monthly product is not linked to any entitlement in RevenueCat. Please contact support.",
+            { duration: 12000 }
+          );
+        }
       } else {
         toast.error("Purchase did not complete.");
       }
