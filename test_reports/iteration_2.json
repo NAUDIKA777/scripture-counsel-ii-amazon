@@ -1,0 +1,59 @@
+{
+  "summary": "Tested end-to-end RevenueCat sandbox flows on the public URL. Paywall correctly opens after 3 free counsels used, and the RC Test Store Purchase dialog is rendered by the SDK (product 'monthly', $9.99 as expected per note). However, clicking 'Test valid purchase' does NOT unlock Pro: paywall stays open, no success toast fires, no Pro pill appears, and localStorage never receives any pro/entitlement marker. Failed-purchase and Restore flows behave correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Sandbox valid purchase does not unlock Pro",
+        "issue": "After clicking 'Test valid purchase' in the RC Test Store dialog, the RC SDK DOES post the receipt (observed POST https://api.revenuecat.com/v1/receipts -> 200), but the Paywall modal never closes, no success toast ('Welcome — the Elder's counsel is now unlimited...') and no error toast ('Purchase did not complete.') is displayed, and access-pill-pro never renders. Console shows repeated warnings: 'Entitlement check failed: Error performing request. Please check your network connection and try again.' originating from p.getCustomerInfo() inside checkProEntitlement (revenuecat.js line ~86). This means purchaseMonthly() likely resolves with no entitlement AND the follow-up refresh in useAccess also fails, leaving isPro=false. Most probable root cause: the 'monthly' product is not attached to the 'pro' entitlement in the RevenueCat dashboard (sandbox), OR the sandbox Test Store purchase does not confer an active entitlement for the configured entitlement id. Because purchaseMonthly() returns Boolean(entitlements.active.pro) which stays false, the app treats it as a silent no-op (no toast — see Paywall.js line 41-47 handleSubscribe: onUnlock only called when unlocked===true; toast.error should have fired otherwise, but did not, suggesting the promise did not resolve within the wait window or an exception was suppressed). Reload after the purchase still shows Free (no pro pill), confirming entitlement never activated.",
+        "affected_selectors": ["[data-testid=\"paywall-subscribe\"]", "[data-testid=\"access-pill-pro\"]", "[data-testid=\"paywall-modal\"]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_results": {
+    "T1_valid_purchase": "FAIL — paywall stays open, no Pro pill, no toast; receipts POST returned 200 but entitlement not active in customerInfo",
+    "T2_failed_purchase": "PASS — paywall stays open, no Pro pill (expected)",
+    "T3_restore_invalid_email": "PASS — 'Please enter a valid email address.' shown",
+    "T3_restore_no_subscription": "PASS — 'No active subscription was found for this email. Please subscribe to continue.' shown",
+    "paywall_opens_after_3_free": "PASS",
+    "paywall_demo_notice_absent": "PASS (RC configured, notice not shown)"
+  },
+  "diagnostic_evidence": {
+    "rc_network_calls_observed": [
+      "GET /v1/subscribers/anon-...  201",
+      "GET /v1/subscribers/anon-...  200",
+      "GET /v1/subscribers/anon-.../offerings  200",
+      "GET /rcbilling/v1/subscribers/anon-.../products?id=monthly&id=yearly&id=lifetime  200",
+      "POST /v1/receipts  200  (Test valid purchase — receipt accepted by RC, but no entitlement returned to client)"
+    ],
+    "console_warnings": [
+      "Entitlement check failed: Ge: Error performing request. Please check your network connection and try again. (repeated on every mount/refresh — from checkProEntitlement -> p.getCustomerInfo())"
+    ],
+    "localStorage_after_valid_purchase": "wisdom_free_counsel_count=3, wisdom_rc_app_user_id set — no pro flag ever written (expected since app relies on RC entitlement, not local flag)"
+  },
+  "test_report_links": [],
+  "action_items": [
+    "In RevenueCat dashboard: verify the 'monthly' product/package in the current Offering is attached to the 'pro' entitlement (env REACT_APP_REVENUECAT_ENTITLEMENT_ID='pro'). Sandbox 'Test valid purchase' will only grant an entitlement if the product is mapped to it. This is the most likely root cause.",
+    "Investigate the recurring 'Entitlement check failed / network error' from RC SDK getCustomerInfo. Since direct GET /v1/subscribers succeeds (200), the SDK's internal network layer may be hitting a different endpoint that fails (possibly CORS or a background request). Enable RC SDK debug logs via Purchases.setLogLevel('debug') to see the failing URL.",
+    "In Paywall.handleSubscribe, add a fallback: if purchaseMonthly() returns false but the receipt POST succeeded, still call access.refresh() and show a neutral toast — right now user gets zero feedback on a successful sandbox purchase that didn't unlock.",
+    "Consider awaiting a small delay + retry on access.refresh() after purchase to work around transient getCustomerInfo failures."
+  ],
+  "critical_code_review_comments": [
+    "Paywall.js handleSubscribe: if purchase() throws with a non-cancel error, the catch swallows it silently when only the cancel regex applies — good — but any actual error string will be surfaced; however if the promise never resolves (RC SDK stuck), user sees no feedback. Add a timeout on purchaseMonthly.",
+    "revenuecat.js checkProEntitlement swallows errors and returns false — this is causing the app to silently degrade to Free on transient network errors. Consider surfacing this to UI (e.g., a subtle 'checking access…' state) or retrying once.",
+    "useAccess.js should re-check entitlement after purchase with a short retry loop instead of a single call, to tolerate RC eventual consistency in sandbox mode."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only tests requested)", "frontend": "60% (3 of 5 sub-flows passed; core sandbox purchase unlock FAILS)"},
+  "test_credentials": "N/A — sandbox purchase uses RC Test Store dialog, no credentials",
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The RC Test Store Purchase dialog IS rendered by the SDK (not in an iframe — it's a portal on the same document). Use page.get_by_role('button', name='Test valid purchase') / 'Test failed purchase' / 'Cancel'. The dialog appears ~3-4 seconds after clicking paywall-subscribe. When retesting, capture Network responses to https://api.revenuecat.com — /v1/receipts=200 means RC accepted the purchase; if paywall still doesn't close, the entitlement mapping in the RC dashboard is wrong. Also monitor console for 'Entitlement check failed' warnings which indicate getCustomerInfo() SDK-side errors.",
+  "rca_of_the_issue": "Root cause hypothesis (in order of likelihood): (1) In RevenueCat dashboard, the 'monthly' product/package is NOT linked to the 'pro' entitlement, so even a successful sandbox purchase (POST /v1/receipts=200) does not set customerInfo.entitlements.active.pro, causing purchaseMonthly() to return false and handleSubscribe to skip onUnlock. (2) RC SDK getCustomerInfo has a persistent internal network error (see repeated console warning) — this alone would prevent useAccess.refresh() from ever seeing entitlement=true even if it were granted. Repro: set localStorage wisdom_free_counsel_count=3, submit a question, click Subscribe, click 'Test valid purchase', observe: paywall remains open, no toast, no access-pill-pro, but /v1/receipts returned 200. Mitigation: fix RC dashboard product↔entitlement mapping and enable Purchases.setLogLevel('debug') to see the failing internal endpoint."
+}

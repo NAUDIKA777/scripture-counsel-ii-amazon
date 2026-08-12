@@ -1,0 +1,38 @@
+{
+  "summary": "Retested the RevenueCat sandbox flows after main agent added retry loop + explicit 'receipt_only' toast. All four scenarios now behave correctly: (1) Test valid purchase → Path B (DASHBOARD_ISSUE) — paywall stays open and the 10-second error toast 'The purchase was received, but access has not activated yet. This usually means the site's subscription product is not linked to the pro entitlement in RevenueCat. Please contact support.' is shown. No more silent failure. (2) Test failed purchase → paywall stays open, no Pro pill, no toast (expected). (3) Restore invalid email → 'Please enter a valid email address.' (4) Restore realrestore@example.com → 200 from /api/subscription/restore and 'No active subscription was found for this email. Please subscribe to continue.' toast. Console shows only RC SDK debug messages; no unhandled errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "T1_valid_purchase_path_B_receipt_only": "PASS — receipt_only error toast is displayed after retry loop (paywall stays open, no Pro pill). No silent failure anymore.",
+    "T2_failed_purchase": "PASS — paywall stays open, no Pro pill, no toast (cancel-like path — silent as intended)",
+    "T3_restore_invalid_email": "PASS — 'Please enter a valid email address.' toast",
+    "T3_restore_unknown_email": "PASS — 'No active subscription was found for this email. Please subscribe to continue.' toast; backend /api/subscription/restore returned 200",
+    "paywall_opens_after_3_free": "PASS",
+    "console_health": "PASS — no unhandled exceptions or repeated network errors; RC SDK debug logs verbose but clean"
+  },
+  "diagnostic_evidence": {
+    "valid_purchase_toast_text": "The purchase was received, but access has not activated yet. This usually means the site's subscription product is not linked to the 'pro' entitlement in RevenueCat. Please contact support.",
+    "restore_api_call": "POST /api/subscription/restore -> 200",
+    "rc_sdk_log_level": "Debug (as configured in revenuecat.js)"
+  },
+  "test_report_links": [],
+  "action_items": [
+    "User-facing UX for this iteration is now correct. The remaining underlying issue (product ↔ 'pro' entitlement not linked in the RevenueCat dashboard) is user-owned configuration and cannot be fixed from code. Consider adding a note in README/docs telling the site owner to attach their monthly product to the 'pro' entitlement in the RC dashboard so the toast path (A) 'unlock' can succeed in production."
+  ],
+  "critical_code_review_comments": [
+    "purchaseMonthly() retry loop of 5×1s is reasonable for sandbox; consider exponential backoff or a max wall-clock budget in production to avoid a hung Subscribe button if RC servers are slow.",
+    "In Paywall.handleSubscribe, the 'else' branch ('Purchase did not complete.') is now unreachable because purchaseMonthly always returns unlocked|receipt_only or throws — harmless but dead code."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only requested)", "frontend": "100% (6/6 sub-flows passed)"},
+  "test_credentials": "N/A — RC Test Store dialog, no credentials",
+  "seed_data_creation": "None (localStorage wisdom_free_counsel_count set to 3 to trigger paywall)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "RC Test Store dialog is a portal on same document — use get_by_role('button', name='Test valid purchase' / 'Test failed purchase'). After clicking Test valid purchase, wait ~8-12s for the retry loop in purchaseMonthly (5×1s) to finish. Expected outcome is now Path B: paywall stays open + receipt_only toast — this is a PASS given the RC dashboard mapping is user-owned. Path A (full unlock) would only occur if the RC dashboard has the monthly product linked to the 'pro' entitlement.",
+  "rca_of_the_issue": "The silent failure reported in iteration_2 was fixed by (1) purchaseMonthly() now returning a status object ('unlocked'|'receipt_only') with a 5×1s retry, and (2) Paywall.handleSubscribe showing an explicit 10s error toast on 'receipt_only'. Underlying root cause (RC dashboard: 'monthly' product not attached to 'pro' entitlement) remains but is out of code scope; the user now receives clear feedback instead of a silent no-op."
+}

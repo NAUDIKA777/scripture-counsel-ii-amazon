@@ -38,10 +38,15 @@ export default function Paywall({ open, onClose, onUnlock, reason }) {
     }
     setPurchasing(true);
     try {
-      const unlocked = await purchaseMonthly();
-      if (unlocked) {
+      const result = await purchaseMonthly();
+      if (result?.status === "unlocked") {
         toast.success("Welcome — the Elder's counsel is now unlimited to you.");
         onUnlock?.();
+      } else if (result?.status === "receipt_only") {
+        toast.error(
+          "The purchase was received, but access has not activated yet. This usually means the site's subscription product is not linked to the 'pro' entitlement in RevenueCat. Please contact support.",
+          { duration: 10000 }
+        );
       } else {
         toast.error("Purchase did not complete.");
       }

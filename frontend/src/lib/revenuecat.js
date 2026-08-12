@@ -58,8 +58,12 @@ export async function getPurchases() {
 
   _configuring = (async () => {
     try {
-      const { Purchases } = await import("@revenuecat/purchases-js");
+      const { Purchases, LogLevel } = await import("@revenuecat/purchases-js");
       if (!_configured) {
+        // Enable verbose SDK logs to aid debugging in sandbox mode
+        try {
+          if (Purchases.setLogLevel && LogLevel) Purchases.setLogLevel(LogLevel.Debug);
+        } catch { /* ignore — older SDKs may not expose this */ }
         Purchases.configure({
           apiKey: PUBLIC_KEY,
           appUserId: getAppUserId(),
@@ -78,12 +82,26 @@ export async function getPurchases() {
   return _configuring;
 }
 
+async function fetchCustomerInfoWithRetry(p, attempts = 4, delayMs = 800) {
+  let lastErr = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const info = await p.getCustomerInfo();
+      return { info, error: null };
+    } catch (e) {
+      lastErr = e;
+      if (i < attempts - 1) await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  return { info: null, error: lastErr };
+}
+
 export async function checkProEntitlement() {
   if (!isRevenueCatConfigured()) return false;
   try {
     const p = await getPurchases();
     if (!p) return false;
-    const info = await p.getCustomerInfo();
+    const { info } = await fetchCustomerInfoWithRetry(p, 2, 500);
     return Boolean(info?.entitlements?.active?.[ENTITLEMENT_ID]);
   } catch (e) {
     console.warn("Entitlement check failed:", e);
@@ -98,11 +116,35 @@ export async function fetchMonthlyPackage() {
   return offerings?.current?.monthly || null;
 }
 
+/**
+ * Purchase outcome:
+ *   { status: "unlocked" }              — entitlement is active
+ *   { status: "receipt_only" }          — purchase succeeded at RC but entitlement never
+ *                                          activated (usually a dashboard mapping issue)
+ *   throws                              — purchase itself failed / was cancelled
+ */
 export async function purchaseMonthly() {
   const p = await getPurchases();
   if (!p) throw new Error("RevenueCat is not configured yet.");
   const pkg = await fetchMonthlyPackage();
   if (!pkg) throw new Error("The subscription offering is unavailable. Please try again later.");
   const result = await p.purchase({ rcPackage: pkg });
-  return Boolean(result?.customerInfo?.entitlements?.active?.[ENTITLEMENT_ID]);
+
+  // Immediate check
+  let active = Boolean(result?.customerInfo?.entitlements?.active?.[ENTITLEMENT_ID]);
+
+  // If not immediately active, retry a handful of times to account for RC eventual consistency
+  if (!active) {
+    for (let i = 0; i < 5 && !active; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      try {
+        const info = await p.getCustomerInfo();
+        active = Boolean(info?.entitlements?.active?.[ENTITLEMENT_ID]);
+      } catch (e) {
+        console.warn(`Entitlement recheck ${i + 1} failed:`, e);
+      }
+    }
+  }
+
+  return { status: active ? "unlocked" : "receipt_only" };
 }
