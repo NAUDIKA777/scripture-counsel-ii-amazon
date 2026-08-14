@@ -1,0 +1,29 @@
+{
+  "summary": "Iteration 10 — Manage Subscription (Stripe Customer Portal) verified end-to-end. Backend: POST /api/subscription/portal returns 404 for unknown user and 200 with portal_url starting https://billing.stripe.com/ for the paid test user anon-2392ee4d-9e7c-44f6-8715-7599a3a5053e. Frontend: after setting localStorage.wisdom_user_id to the paid user id, the nav shows data-testid='access-pill-pro' rendered as a <button> containing the Sparkles icon, 'PRO' text, and a trailing Settings gear icon. Clicking it triggers context.expect_page() and opens https://billing.stripe.com/p/session/test_... in a new tab. Regression: clearing localStorage shows access-pill-free (no Pro pill), and clicking it opens the paywall-modal as before. Full pytest regression (7 tests from iteration_9) + 2 new portal tests all pass (9/9).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_portal_flow.py",
+    "/app/backend/tests/test_stripe_flow.py",
+    "/app/test_reports/pytest/iter10_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Backend correctly rejects portal requests for users without an active subscription (404), preventing abuse.",
+    "_ensure_portal_configuration() fallback works — the sandbox account did not previously have a default billing portal config and yet the endpoint returned a valid portal URL on first call.",
+    "Frontend: access-pill-pro is now a proper <button> and dispatches window.open with target=_blank + noopener,noreferrer (safe). Loader spinner state exists in code but not observed in test because the API responded < 300 ms; not a bug.",
+    "Suggestion (non-blocking): consider aria-label='Manage subscription' on the Pro pill button for screen readers, and disabling the button while the request is in-flight to prevent double-clicks."
+  ],
+  "updated_files": ["/app/backend/tests/test_portal_flow.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Paid Pro user (no login): localStorage.wisdom_user_id = 'anon-2392ee4d-9e7c-44f6-8715-7599a3a5053e'.",
+  "seed_data_creation": "None — reused paid subscription from iteration_8.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Portal endpoint: POST /api/subscription/portal {app_user_id,return_url}. Returns 404 without active sub, 200 {portal_url:'https://billing.stripe.com/p/session/test_...'} with active sub. Pro pill (data-testid=access-pill-pro) is a <button>; when clicked calls openBillingPortal() then window.open(url,'_blank'). Use context.expect_page() in Playwright to catch the new tab. Do NOT try to interact inside the Stripe billing portal UI.",
+  "rca of the issue": "N/A — feature working as specified."
+}

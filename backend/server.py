@@ -81,6 +81,11 @@ class CheckoutRequest(BaseModel):
     email: Optional[EmailStr] = None
 
 
+class PortalRequest(BaseModel):
+    app_user_id: str
+    return_url: str
+
+
 class RestoreRequest(BaseModel):
     email: EmailStr
 
@@ -450,6 +455,70 @@ async def subscription_status(app_user_id: str):
             logger.warning(f"Stripe subscription retrieve failed: {e}")
 
     return {"app_user_id": app_user_id, "pro_active": active, "email": sub.get("email")}
+
+
+def _ensure_portal_configuration() -> Optional[str]:
+    """Return an active Stripe Billing Portal configuration id, creating a default
+    one if the account doesn't have any yet. Returns None on failure."""
+    try:
+        existing = stripe.billing_portal.Configuration.list(active=True, limit=1).data
+        if existing:
+            return existing[0].id
+        cfg = stripe.billing_portal.Configuration.create(
+            business_profile={"headline": "Wisdom & Word — manage your subscription"},
+            features={
+                "customer_update": {"enabled": True, "allowed_updates": ["email"]},
+                "invoice_history": {"enabled": True},
+                "payment_method_update": {"enabled": True},
+                "subscription_cancel": {
+                    "enabled": True,
+                    "mode": "at_period_end",
+                    "cancellation_reason": {
+                        "enabled": True,
+                        "options": ["too_expensive", "missing_features", "unused", "customer_service", "other"],
+                    },
+                },
+            },
+        )
+        return cfg.id
+    except stripe.error.StripeError as e:
+        logger.warning(f"Portal configuration setup failed: {e}")
+        return None
+
+
+@api_router.post("/subscription/portal")
+async def customer_portal(req: PortalRequest):
+    """Create a Stripe Billing Portal session so a Pro user can manage / cancel
+    their subscription, update card, view invoices."""
+    if not STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=503, detail="Payments not configured")
+
+    sub = await db.subscriptions.find_one({"app_user_id": req.app_user_id.strip()}, {"_id": 0})
+    customer_id = sub.get("stripe_customer_id") if sub else None
+    if not customer_id:
+        raise HTTPException(status_code=404, detail="No active subscription found for this user")
+
+    try:
+        portal = stripe.billing_portal.Session.create(
+            customer=customer_id,
+            return_url=req.return_url,
+        )
+    except stripe.error.InvalidRequestError as e:
+        msg = (getattr(e, "user_message", "") or str(e)).lower()
+        if "configuration" in msg or "no configuration" in msg or "default configuration" in msg:
+            cfg_id = _ensure_portal_configuration()
+            if not cfg_id:
+                raise HTTPException(status_code=500, detail="Could not create billing portal configuration")
+            portal = stripe.billing_portal.Session.create(
+                customer=customer_id,
+                return_url=req.return_url,
+                configuration=cfg_id,
+            )
+        else:
+            logger.exception("Portal session creation failed")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    return {"portal_url": portal.url}
 
 
 @api_router.post("/subscription/restore")

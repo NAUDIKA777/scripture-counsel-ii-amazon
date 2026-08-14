@@ -84,3 +84,11 @@ export async function restoreByEmail(email) {
   const res = await axios.post(`${API}/subscription/restore`, { email: email.trim().toLowerCase() });
   return res.data; // { app_user_id, pro_active, found }
 }
+
+export async function openBillingPortal() {
+  const res = await axios.post(`${API}/subscription/portal`, {
+    app_user_id: getAppUserId(),
+    return_url: window.location.origin,
+  });
+  return res.data.portal_url;
+}
