@@ -3,12 +3,11 @@ import {
   checkProEntitlement,
   getFreeCount,
   incrementFreeCount,
-  isRevenueCatConfigured,
   FREE_LIMIT,
-} from "@/lib/revenuecat";
+} from "@/lib/subscription";
 
 /**
- * Combines RevenueCat "pro" entitlement + local free-counsel counter.
+ * Combines the Stripe-backed Pro entitlement + local free-counsel counter.
  * canAsk  -> user is allowed to submit a new counsel
  * mustPay -> free counsels exhausted and no active subscription
  */
@@ -50,7 +49,6 @@ export function useAccess() {
     freeLimit: FREE_LIMIT,
     mustPay,
     canAsk,
-    rcConfigured: isRevenueCatConfigured(),
     refresh,
     recordFreeUse,
   };

@@ -1,15 +1,7 @@
 import React, { useState } from "react";
-import axios from "axios";
 import { toast } from "sonner";
 import { Loader2, X, Check, Sparkles, Volume2, ScrollText, Share2, Mail } from "lucide-react";
-import {
-  purchaseMonthly,
-  isRevenueCatConfigured,
-  setAppUserId,
-  setStoredEmail,
-} from "@/lib/revenuecat";
-
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+import { startCheckout, restoreByEmail, setAppUserId, setStoredEmail } from "@/lib/subscription";
 
 const benefits = [
   { icon: ScrollText, label: "Unlimited counsel from Scripture" },
@@ -22,49 +14,21 @@ export default function Paywall({ open, onClose, onUnlock, reason }) {
   const [purchasing, setPurchasing] = useState(false);
   const [showRestore, setShowRestore] = useState(false);
   const [email, setEmail] = useState("");
+  const [checkoutEmail, setCheckoutEmail] = useState("");
   const [restoring, setRestoring] = useState(false);
 
   if (!open) return null;
 
-  const configured = isRevenueCatConfigured();
-
   const handleSubscribe = async () => {
-    if (!configured) {
-      toast.error(
-        "Payments are not activated yet. The site owner must add the RevenueCat API key.",
-        { duration: 5000 }
-      );
-      return;
-    }
     setPurchasing(true);
     try {
-      const result = await purchaseMonthly();
-      if (result?.status === "unlocked") {
-        toast.success("Welcome — the Elder's counsel is now unlimited to you.");
-        onUnlock?.();
-      } else if (result?.status === "receipt_only") {
-        const activeIds = result.activeEntitlementIds || [];
-        const expected = result.expectedEntitlementId;
-        if (activeIds.length > 0) {
-          // RC granted SOME entitlement — just not the exact identifier we expected.
-          // Show a super-clear diagnostic so a case/name mismatch is obvious.
-          toast.error(
-            `Purchase received. Entitlement returned: "${activeIds.join('", "')}" but the app expects "${expected}". Ask the site owner to align the identifier.`,
-            { duration: 15000 }
-          );
-        } else {
-          toast.error(
-            "Purchase received but no entitlement was granted. The site's monthly product is not linked to any entitlement in RevenueCat. Please contact support.",
-            { duration: 12000 }
-          );
-        }
-      } else {
-        toast.error("Purchase did not complete.");
-      }
+      const { checkout_url } = await startCheckout(checkoutEmail || undefined);
+      if (!checkout_url) throw new Error("No checkout URL returned.");
+      // Redirect to Stripe Checkout
+      window.location.href = checkout_url;
     } catch (e) {
-      const msg = e?.message || "Purchase failed. Please try again.";
-      if (!/cancel/i.test(msg)) toast.error(msg);
-    } finally {
+      console.error(e);
+      toast.error(e?.response?.data?.detail || e?.message || "Could not start checkout. Please try again.");
       setPurchasing(false);
     }
   };
@@ -77,8 +41,7 @@ export default function Paywall({ open, onClose, onUnlock, reason }) {
     }
     setRestoring(true);
     try {
-      const res = await axios.post(`${API}/subscription/restore`, { email: clean });
-      const { app_user_id, pro_active } = res.data;
+      const { app_user_id, pro_active, found } = await restoreByEmail(clean);
       if (app_user_id) {
         setAppUserId(app_user_id);
         setStoredEmail(clean);
@@ -87,8 +50,11 @@ export default function Paywall({ open, onClose, onUnlock, reason }) {
         toast.success("Access restored. Welcome back.");
         onUnlock?.();
       } else {
-        toast.info(
-          "No active subscription was found for this email. Please subscribe to continue."
+        toast.error(
+          found
+            ? "This subscription is no longer active. Please subscribe again."
+            : "No subscription was found for this email. Please subscribe to continue.",
+          { duration: 6000 }
         );
       }
     } catch (e) {
@@ -111,7 +77,7 @@ export default function Paywall({ open, onClose, onUnlock, reason }) {
         aria-hidden="true"
       />
 
-      <div className="relative w-full max-w-lg glass-strong rounded-3xl p-8 md:p-10 shadow-2xl rise-in">
+      <div className="relative w-full max-w-lg glass-strong rounded-3xl p-8 md:p-10 shadow-2xl rise-in max-h-[92vh] overflow-y-auto">
         <button
           onClick={onClose}
           data-testid="paywall-close"
@@ -161,31 +127,39 @@ export default function Paywall({ open, onClose, onUnlock, reason }) {
               <Check className="w-5 h-5" style={{ color: "var(--gold)" }} strokeWidth={2} />
             </div>
 
+            <label className="block mt-6 text-[10px] uppercase tracking-[0.3em] text-slate-400 mb-2">
+              Email (for receipts &amp; access recovery — optional)
+            </label>
+            <input
+              type="email"
+              value={checkoutEmail}
+              onChange={(e) => setCheckoutEmail(e.target.value)}
+              placeholder="you@example.com"
+              data-testid="checkout-email-input"
+              autoComplete="email"
+              className="w-full rounded-xl bg-white/5 border border-white/15 px-4 py-3 text-slate-100 placeholder:text-slate-500 focus:border-amber-300/60 outline-none"
+            />
+
             <button
               onClick={handleSubscribe}
               disabled={purchasing}
               data-testid="paywall-subscribe"
-              className="mt-6 w-full inline-flex items-center justify-center gap-2 rounded-full py-3.5 font-medium text-slate-950 hover:brightness-110 disabled:opacity-60"
+              className="mt-5 w-full inline-flex items-center justify-center gap-2 rounded-full py-3.5 font-medium text-slate-950 hover:brightness-110 disabled:opacity-60"
               style={{ backgroundColor: "var(--gold)" }}
             >
               {purchasing ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2} />
-                  <span className="uppercase tracking-widest text-sm">Processing</span>
+                  <span className="uppercase tracking-widest text-sm">Redirecting</span>
                 </>
               ) : (
                 <span className="uppercase tracking-widest text-sm">Subscribe · $4.99 / month</span>
               )}
             </button>
 
-            {!configured && (
-              <div
-                className="mt-4 text-xs text-amber-200/80 text-center leading-relaxed"
-                data-testid="paywall-demo-notice"
-              >
-                Preview mode — payments are not yet active on this site.
-              </div>
-            )}
+            <div className="mt-3 text-[10px] text-center text-slate-500 tracking-widest uppercase">
+              Secure checkout by Stripe · Test card 4242 4242 4242 4242
+            </div>
 
             <button
               onClick={() => setShowRestore(true)}
@@ -195,9 +169,6 @@ export default function Paywall({ open, onClose, onUnlock, reason }) {
               <Mail className="w-3.5 h-3.5" strokeWidth={1.5} />
               Restore access with email
             </button>
-
-            {/* Managed paywall target (unused when using custom UI, but kept for future) */}
-            <div id="revenuecat-paywall" />
           </>
         ) : (
           <>
@@ -208,8 +179,8 @@ export default function Paywall({ open, onClose, onUnlock, reason }) {
               Welcome back.
             </h2>
             <p className="mt-3 text-slate-300 leading-relaxed">
-              Enter the email you used when you subscribed. We will find your account and restore
-              full access to this browser.
+              Enter the email you used at checkout. We will find your subscription and restore full
+              access to this browser.
             </p>
 
             <label className="block mt-6 text-xs uppercase tracking-widest text-slate-400 mb-2">
