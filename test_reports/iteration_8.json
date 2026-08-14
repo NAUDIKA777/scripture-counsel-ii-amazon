@@ -1,0 +1,28 @@
+{
+  "summary": "Iteration 8 — REAL end-to-end Stripe test purchase completed successfully. Verified full flow: paywall → Stripe hosted checkout → real card fill (4242 4242 4242 4242) → 'Pay and subscribe' click → redirect back to /payment/success → 'Welcome, dear friend.' + 'Your subscription is active.' → Continue → home shows access-pill-pro → new question does NOT trigger paywall → PRO persists across full page reload (backend /api/subscription/status resolves via app_user_id in localStorage).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Stripe Checkout", "issues": ["Stripe hosted checkout displays price as €5.45 (EUR with 21% VAT) instead of the advertised $4.99. Because Stripe geo-detects, this shows Netherlands + EUR by default. Users clicking Subscribe expecting $4.99 will see a higher local total. Consider fixing the Checkout Session locale/currency, forcing USD, or displaying region-aware pricing on the paywall."]}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_8.json"],
+  "action_items": [
+    "Optional: Force Stripe Checkout Session currency to USD (or advertise EUR pricing on paywall) so displayed price matches the '$4.99/mo' shown in-app.",
+    "Consider adding data-testid='counsel-card' on generated counsel cards to make future counsel-generation assertions robust (current test verified only 'no paywall reopen' after Pro question)."
+  ],
+  "critical_code_review_comments": [
+    "Webhook-independent fallback in /api/payments/status worked correctly — poll returned paid within first cycle after redirect back, so 'Welcome, dear friend.' appeared at index 0. Good resilient design.",
+    "Home page correctly re-checks entitlement via useAccess on mount after Continue click — access-pill-pro rendered without manual refresh."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Anonymous app (no login). Stripe TEST card 4242 4242 4242 4242 / 12/34 / 123. Test email: testpurchase-{ts}@example.com. app_user_id lives in localStorage 'wisdom_user_id'.",
+  "seed_data_creation": "Set localStorage 'wisdom_free_counsel_count' = '3' to force paywall. A real Stripe test subscription was created for testpurchase-1786666293@example.com (Session cs_test_a1CtWqM9ag2kwgTP4VqlYrY74U6Rt7ZVou26ovokJhYtBokZHOa9R2rPTB).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iteration 8 fully validated the paid subscription flow end-to-end using real Stripe test card 4242. All 14 steps of the requested flow passed. The only observation is a currency/locale display mismatch (€5.45 EUR shown on Stripe vs $4.99 USD on paywall) — not a functional bug but a UX inconsistency. If retesting, remember Stripe checkout page has DIRECT accessible inputs (no iframe): use selectors input[name='cardNumber'|'cardExpiry'|'cardCvc'|'billingName']. Pay button is 'Pay and subscribe' (button[type=submit]).",
+  "rca of the issue": "N/A — no issues encountered. All expected behaviors observed: (1) paywall opened after 3 free counsels, (2) Stripe checkout accepted card, (3) redirect back landed on /payment/success with session_id, (4) polling status returned paid on first iteration (fallback that fetches Session from Stripe worked without webhook), (5) app_user_id-based subscription lookup persisted PRO across reload."
+}
