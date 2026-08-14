@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wisdom &amp; Word — Ancient Counsel from the Bible</title>
+<meta name="description" content="Bring what troubles you. Receive counsel from the Holy Bible, King James Version — spoken in a warm statesman voice, with every verse cited.">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Wisdom &amp; Word">
+<meta property="og:title" content="Wisdom &amp; Word — Ancient Counsel from the Bible">
+<meta property="og:description" content="Bring what troubles you. Receive counsel from the Holy Bible (KJV) — spoken in a warm statesman voice, with every verse cited.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Wisdom &amp; Word — Ancient Counsel from the Bible">
+<meta name="twitter:description" content="Counsel drawn only from the King James Version. Every answer cites Scripture. Three free counsels — no signup.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg: #030712;
+    --bg-2: #0f172a;
+    --panel: rgba(15,23,42,0.7);
+    --text: #f8fafc;
+    --muted: #94a3b8;
+    --dim: #64748b;
+    --gold: #d4af37;
+    --gold-soft: #fde68a;
+    --border: rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.18);
+    --gold-border: rgba(212,175,55,0.4);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Manrope', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  h1, h2, h3, h4, .serif { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 500; letter-spacing: -0.01em; }
+  ::selection { background: rgba(212,175,55,0.35); color: #030712; }
+
+  /* Grain overlay for depth */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.04 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    opacity: 0.5; mix-blend-mode: overlay;
+  }
+
+  .container { max-width: 1120px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 2; }
+
+  /* ============ NAV ============ */
+  nav {
+    position: sticky; top: 0; z-index: 40;
+    background: rgba(3,7,18,0.85); backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+  }
+  nav .container { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand svg { color: var(--gold); }
+  .brand-name { font-family: 'Cormorant Garamond', serif; font-size: 22px; letter-spacing: -0.01em; }
+  .brand-sub { font-size: 10px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--muted); margin-top: 2px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 12px 24px; border-radius: 999px;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.24em; text-transform: uppercase;
+    transition: transform 200ms ease, filter 200ms ease, background 200ms ease, color 200ms ease;
+    cursor: pointer; border: none; font-family: inherit;
+  }
+  .btn-primary { background: var(--gold); color: #030712; }
+  .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .btn-ghost {
+    background: transparent; color: var(--text);
+    border: 1px solid var(--border-strong);
+  }
+  .btn-ghost:hover { border-color: var(--gold-border); color: var(--gold-soft); background: rgba(212,175,55,0.06); }
+  .btn-lg { padding: 16px 32px; font-size: 13px; }
+
+  /* ============ HERO ============ */
+  .hero {
+    position: relative; padding: 120px 0 96px; overflow: hidden;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% -10%, rgba(212,175,55,0.12) 0%, transparent 60%),
+      linear-gradient(180deg, rgba(3,7,18,0.55) 0%, rgba(3,7,18,0.9) 60%, var(--bg) 100%),
+      url("https://images.unsplash.com/photo-1454105511235-eda89ad84214?crop=entropy&cs=srgb&fm=jpg&q=85") center/cover no-repeat;
+  }
+  .eyebrow { font-size: 11px; letter-spacing: 0.4em; text-transform: uppercase; color: var(--gold-soft); }
+  .hero h1 {
+    font-size: clamp(44px, 7vw, 88px);
+    line-height: 1.02; margin: 22px 0 24px 0;
+    letter-spacing: -0.015em;
+  }
+  .hero h1 .italic { font-style: italic; color: var(--gold); }
+  .hero p.lede {
+    font-size: clamp(17px, 1.4vw, 21px);
+    color: #cbd5e1; max-width: 640px; margin: 0 0 40px 0;
+  }
+  .hero-cta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+  .hero-note {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--muted); font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase;
+    margin-top: 20px;
+  }
+  .hero-note::before { content: ""; width: 24px; height: 1px; background: var(--gold); display: inline-block; }
+
+  /* ============ SECTION ============ */
+  section { padding: 96px 0; position: relative; }
+  section h2 {
+    font-size: clamp(34px, 4.5vw, 56px);
+    line-height: 1.08; margin: 16px 0 24px 0;
+  }
+  section h2 .italic { font-style: italic; color: var(--gold); }
+  section p.section-lede { max-width: 680px; color: #cbd5e1; font-size: 17px; line-height: 1.7; }
+
+  /* ============ HOW ============ */
+  .how-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 56px;
+  }
+  .how-step {
+    padding: 32px; border: 1px solid var(--border); border-radius: 20px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+    transition: border-color 200ms ease, transform 200ms ease;
+  }
+  .how-step:hover { border-color: var(--gold-border); transform: translateY(-2px); }
+  .how-num {
+    font-family: 'Cormorant Garamond', serif; font-size: 42px; font-style: italic;
+    color: var(--gold); line-height: 1; margin-bottom: 20px;
+  }
+  .how-step h3 { font-size: 24px; margin: 0 0 10px 0; color: var(--text); }
+  .how-step p { color: var(--muted); font-size: 15px; margin: 0; }
+
+  /* ============ FEATURES ============ */
+  .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 56px; }
+  .feature {
+    padding: 28px; border: 1px solid var(--border); border-radius: 18px;
+    background: rgba(15,23,42,0.4); transition: border-color 200ms ease, background 200ms ease;
+  }
+  .feature:hover { border-color: var(--gold-border); background: rgba(15,23,42,0.6); }
+  .feature-icon {
+    width: 40px; height: 40px; border-radius: 999px; border: 1px solid var(--gold-border);
+    display: flex; align-items: center; justify-content: center; color: var(--gold); margin-bottom: 20px;
+  }
+  .feature h3 { font-size: 20px; margin: 0 0 8px 0; }
+  .feature p { color: var(--muted); font-size: 14px; margin: 0; line-height: 1.7; }
+
+  /* ============ VERSE CARD SHOWCASE ============ */
+  .showcase {
+    background:
+      radial-gradient(ellipse 60% 50% at 50% 30%, rgba(212,175,55,0.08) 0%, transparent 60%),
+      linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 50%, var(--bg) 100%);
+    text-align: center;
+  }
+  .showcase .container { max-width: 900px; }
+  .verse-card {
+    max-width: 460px; margin: 56px auto 0;
+    aspect-ratio: 4/5;
+    background: linear-gradient(180deg, #030712 0%, #0f172a 60%, #030712 100%);
+    border: 1px solid var(--gold-border); border-radius: 24px;
+    padding: 40px 32px; text-align: left; display: flex; flex-direction: column; justify-content: space-between;
+    box-shadow: 0 40px 100px rgba(0,0,0,0.6);
+    position: relative; overflow: hidden;
+  }
+  .verse-card .top {
+    display: flex; align-items: center; gap: 12px;
+    font-size: 10px; letter-spacing: 0.4em; text-transform: uppercase; color: var(--gold);
+  }
+  .verse-card .top::before, .verse-card .top::after { content: ""; height: 1px; flex: 1; background: rgba(212,175,55,0.3); }
+  .verse-card .quote {
+    font-family: 'Cormorant Garamond', serif; font-style: italic;
+    font-size: clamp(20px, 3vw, 30px); line-height: 1.35;
+    color: var(--gold-soft); margin: 24px 0;
+  }
+  .verse-card .ref { font-size: 12px; letter-spacing: 0.35em; text-transform: uppercase; color: var(--gold); font-weight: 600; }
+  .verse-card .kjv { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+  .verse-card .brand-foot {
+    margin-top: auto; padding-top: 24px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .verse-card .brand-foot-title { font-family: 'Cormorant Garamond', serif; font-size: 20px; }
+  .verse-card .brand-foot-sub { font-size: 9px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--muted); }
+  .verse-card .seal {
+    width: 44px; height: 44px; border-radius: 999px; border: 1.5px solid var(--gold);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--gold); font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 22px;
+  }
+
+  /* ============ PRICING ============ */
+  .pricing-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 56px;
+  }
+  .plan {
+    padding: 40px 32px; border-radius: 20px; border: 1px solid var(--border);
+    background: rgba(15,23,42,0.5);
+  }
+  .plan.featured {
+    border-color: var(--gold-border);
+    background: linear-gradient(180deg, rgba(212,175,55,0.06) 0%, rgba(15,23,42,0.5) 100%);
+    position: relative;
+  }
+  .plan.featured::before {
+    content: "Recommended";
+    position: absolute; top: -12px; left: 32px;
+    background: var(--gold); color: #030712;
+    font-size: 10px; letter-spacing: 0.28em; text-transform: uppercase; font-weight: 700;
+    padding: 5px 12px; border-radius: 999px;
+  }
+  .plan h3 { font-size: 28px; margin: 0 0 6px 0; }
+  .plan .price {
+    font-family: 'Cormorant Garamond', serif; font-size: 56px; line-height: 1; color: var(--text);
+    margin: 20px 0 6px 0;
+  }
+  .plan .price .cents { font-size: 24px; color: var(--muted); vertical-align: super; margin-left: 6px; }
+  .plan .price-sub { color: var(--muted); font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 32px; }
+  .plan ul { list-style: none; padding: 0; margin: 0 0 32px 0; }
+  .plan li {
+    display: flex; align-items: start; gap: 12px;
+    padding: 8px 0; color: #cbd5e1; font-size: 15px;
+  }
+  .plan li svg { flex-shrink: 0; margin-top: 3px; color: var(--gold); }
+  .plan .btn { width: 100%; justify-content: center; }
+
+  /* ============ TRANSPARENCY ============ */
+  .transparency {
+    background: linear-gradient(180deg, var(--bg) 0%, rgba(15,23,42,0.6) 50%, var(--bg) 100%);
+  }
+  .transparency .card {
+    max-width: 780px; margin: 0 auto; padding: 56px 48px;
+    border: 1px solid var(--gold-border); border-radius: 24px;
+    background: rgba(15,23,42,0.5);
+    text-align: left;
+  }
+  .transparency h2 { text-align: center; }
+  .transparency .center { text-align: center; }
+  .transparency p {
+    color: #cbd5e1; font-size: 17px; line-height: 1.85; margin: 20px 0 0 0;
+  }
+  .transparency .signature {
+    margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border);
+    color: var(--muted); font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase;
+    text-align: center;
+  }
+
+  /* ============ FINAL CTA ============ */
+  .final-cta {
+    text-align: center; padding: 140px 0 120px;
+    background: radial-gradient(ellipse 60% 60% at 50% 50%, rgba(212,175,55,0.1) 0%, transparent 60%);
+  }
+  .final-cta h2 { font-size: clamp(40px, 6vw, 72px); }
+  .final-cta .btn { margin-top: 32px; }
+  .final-cta .sub { color: var(--muted); font-size: 12px; letter-spacing: 0.24em; text-transform: uppercase; margin-top: 24px; }
+
+  /* ============ FOOTER ============ */
+  footer {
+    border-top: 1px solid var(--border); padding: 40px 0;
+    text-align: center; color: var(--dim);
+    font-size: 11px; letter-spacing: 0.28em; text-transform: uppercase;
+  }
+  footer .divider { display: inline-block; width: 20px; text-align: center; color: var(--gold); }
+
+  /* ============ ANIMATIONS ============ */
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .rise { animation: rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .delay-1 { animation-delay: 0.12s; }
+  .delay-2 { animation-delay: 0.24s; }
+  .delay-3 { animation-delay: 0.36s; }
+
+  /* ============ RESPONSIVE ============ */
+  @media (max-width: 900px) {
+    .how-grid, .features-grid, .pricing-grid { grid-template-columns: 1fr; }
+    section { padding: 72px 0; }
+    .hero { padding: 80px 0 64px; }
+    .transparency .card { padding: 40px 28px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rise { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="container">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 12a3 3 0 1 0-6 0 3 3 0 0 0 6 0Z"/><path d="M2 6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v14a1 1 0 0 1-1.44.9L18 20l-2.56 1.28a1 1 0 0 1-.88 0L12 20l-2.56 1.28a1 1 0 0 1-.88 0L6 20l-2.56.9A1 1 0 0 1 2 20V6Z" style="display:none"/><path d="M4 4h14a2 2 0 0 1 2 2v14l-3-2-3 2-3-2-3 2-3-2-3 2V6a2 2 0 0 1 2-2Z"/></svg>
+      <div>
+        <div class="brand-name">Wisdom &amp; Word</div>
+        <div class="brand-sub">Counsel from Scripture · KJV</div>
+      </div>
+    </div>
+    <a href="https://scripture-counsel-2.emergent.host" class="btn btn-primary" data-testid="nav-cta">
+      Try Free →
+    </a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="container">
+    <div class="rise">
+      <div class="eyebrow">· Ancient Counsel · King James Version ·</div>
+    </div>
+    <h1 class="rise delay-1">
+      Bring what troubles you.<br>
+      <span class="italic">Receive ancient counsel.</span>
+    </h1>
+    <p class="lede rise delay-2">
+      Wisdom &amp; Word answers what weighs upon your heart with the Bible alone —
+      spoken in a warm statesman voice, with every verse cited from the King James Version.
+    </p>
+    <div class="hero-cta rise delay-3">
+      <a href="https://scripture-counsel-2.emergent.host" class="btn btn-primary btn-lg" data-testid="hero-cta">
+        Ask the Elder →
+      </a>
+      <a href="#how" class="btn btn-ghost btn-lg">See How It Works</a>
+    </div>
+    <div class="hero-note rise delay-3">
+      Three free counsels · No signup required
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="container">
+    <div class="eyebrow">How it works</div>
+    <h2>Three steps.<br><span class="italic">Then Scripture speaks.</span></h2>
+    <p class="section-lede">
+      No forms. No accounts. Just what has always worked when the soul is troubled —
+      quiet, an honest question, and the Word.
+    </p>
+
+    <div class="how-grid">
+      <div class="how-step">
+        <div class="how-num">i.</div>
+        <h3>Share what weighs on you</h3>
+        <p>Anxiety, grief, forgiveness, purpose, doubt, marriage. Ask what you can barely say aloud.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-num">ii.</div>
+        <h3>Receive counsel from Scripture</h3>
+        <p>Answers are drawn only from the Holy Bible, King James Version. No opinion. No trend.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-num">iii.</div>
+        <h3>Hear it. Save it. Share it.</h3>
+        <p>Listen to the counsel read aloud, and share any cited verse with someone who needs it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section style="background: rgba(15,23,42,0.3);">
+  <div class="container">
+    <div class="eyebrow">What you receive</div>
+    <h2>Warmth of a pastor.<br><span class="italic">Certainty of Scripture.</span></h2>
+
+    <div class="features-grid">
+      <div class="feature">
+        <div class="feature-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
+        <h3>Bible-only counsel</h3>
+        <p>Every answer is grounded strictly in the King James Version. Never psychology, never trend, never opinion.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></div>
+        <h3>Statesman voice</h3>
+        <p>A warm, thoughtful voice reads every counsel aloud — the way an elder in a quiet room would speak to you.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg></div>
+        <h3>Every verse cited</h3>
+        <p>Book, chapter, verse — and the full KJV text. Nothing paraphrased. You can look every reference up yourself.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
+        <h3>Shareable verse cards</h3>
+        <p>Turn any cited scripture into a beautiful Instagram-ready image, or a link that previews on X, WhatsApp, and Facebook.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></div>
+        <h3>Verse of today</h3>
+        <p>A daily KJV passage waits for you — small enough to sit with, weighty enough to carry through the day.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+        <h3>Private &amp; anonymous</h3>
+        <p>No account. No profile. What you ask stays yours. The questions you can hardly speak aloud have a safe place here.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VERSE CARD SHOWCASE -->
+<section class="showcase">
+  <div class="container">
+    <div class="eyebrow">Made to be shared</div>
+    <h2>Every verse<br><span class="italic">becomes a small light.</span></h2>
+    <p class="section-lede" style="margin-left: auto; margin-right: auto;">
+      When a verse moves you, save it as a beautiful image ready for Instagram Stories,
+      or send the link to someone who needs it — it opens as a rich preview on X, WhatsApp, and iMessage.
+    </p>
+
+    <div class="verse-card">
+      <div class="top"><span>Scripture</span></div>
+      <div>
+        <div class="quote">&ldquo;The LORD is my shepherd; I shall not want.&rdquo;</div>
+        <div class="ref">Psalm 23:1</div>
+        <div class="kjv">King James Version</div>
+      </div>
+      <div class="brand-foot">
+        <div>
+          <div class="brand-foot-title">Wisdom &amp; Word</div>
+          <div class="brand-foot-sub">Counsel from Scripture</div>
+        </div>
+        <div class="seal">W</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="container">
+    <div class="eyebrow">Pricing</div>
+    <h2>Simple.<br><span class="italic">Honest. Affordable.</span></h2>
+    <p class="section-lede">
+      Come in for free. If Wisdom &amp; Word becomes part of your life, walk further for the price of a cup of coffee — once a month.
+    </p>
+
+    <div class="pricing-grid">
+      <div class="plan">
+        <h3>Try Free</h3>
+        <div class="price">$0</div>
+        <div class="price-sub">Three counsels · no signup</div>
+        <ul>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>3 counsels from the Elder</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>Every verse cited from KJV</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>Verse of Today</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>Shareable verse images &amp; links</span></li>
+        </ul>
+        <a href="https://scripture-counsel-2.emergent.host" class="btn btn-ghost">Begin Free →</a>
+      </div>
+
+      <div class="plan featured">
+        <h3>Pro</h3>
+        <div class="price">$4<span class="cents">.99</span></div>
+        <div class="price-sub">per month · Cancel any time</div>
+        <ul>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>Unlimited counsel from Scripture</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>Statesman voice reads every answer aloud</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>Session history saved for reflection</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>Priority server capacity</span></li>
+          <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span>Cancel any time from your account</span></li>
+        </ul>
+        <a href="https://scripture-counsel-2.emergent.host" class="btn btn-primary">Become Pro →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRANSPARENCY -->
+<section class="transparency">
+  <div class="container">
+    <div class="card">
+      <div class="eyebrow center">Why the small subscription</div>
+      <h2>An honest word<br><span class="italic">about the cost.</span></h2>
+
+      <p>
+        Every question you bring to Wisdom &amp; Word is answered by advanced AI running on
+        high-performance cloud hardware — the kind of servers that keep responses thoughtful,
+        fast, and reliable. That capacity isn't free.
+      </p>
+      <p>
+        As more hearts find their way here, we rent more of that infrastructure so answers stay
+        warm and quick for everyone — not just the first few. The Elder should never keep anyone
+        waiting when they've come in trouble.
+      </p>
+      <p>
+        <strong style="color: var(--gold-soft);">$4.99 a month covers those server costs. Nothing more.</strong>
+        No investors dictating direction. No ads inserted between you and Scripture. No algorithms
+        shaping what you receive. Just the Bible, and time to sit with it.
+      </p>
+      <p style="color: var(--muted); font-size: 15px;">
+        Three counsels are free, always. If what you find here becomes part of your life,
+        the subscription keeps the servers on for the next person who arrives in need.
+      </p>
+
+      <div class="signature">
+        With gratitude · The stewards of Wisdom &amp; Word
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="final-cta">
+  <div class="container">
+    <div class="eyebrow">Begin now</div>
+    <h2>
+      Ask what you<br>
+      <span class="italic">can barely say aloud.</span>
+    </h2>
+    <a href="https://scripture-counsel-2.emergent.host" class="btn btn-primary btn-lg" data-testid="final-cta">
+      Enter Wisdom &amp; Word →
+    </a>
+    <div class="sub">Three free counsels · No signup required</div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <span>Counsel drawn from the Holy Bible</span>
+    <span class="divider">·</span>
+    <span>King James Version</span>
+    <span class="divider">·</span>
+    <span>© Wisdom &amp; Word</span>
+  </div>
+</footer>
+
+</body>
+</html>
