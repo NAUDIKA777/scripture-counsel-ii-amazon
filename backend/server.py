@@ -314,21 +314,34 @@ async def create_checkout(req: CheckoutRequest):
         success_url=f"{req.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{req.origin_url}/payment/cancel",
         metadata=metadata,
+        # Force USD display for every buyer — no automatic currency conversion.
+        adaptive_pricing={"enabled": False},
     )
     if req.email:
         kwargs["customer_email"] = req.email.lower().strip()
 
-    # tax_mode=full — US + digital subscription → SMP (Stripe manages tax)
-    try:
-        session = stripe.checkout.Session.create(**kwargs, managed_payments={"enabled": True})
-    except stripe.error.InvalidRequestError as e:
-        msg = (getattr(e, "user_message", "") or "").lower()
-        if "managed payments" in msg or "ineligible" in msg:
-            session = stripe.checkout.Session.create(
-                **kwargs, automatic_tax={"enabled": True}, billing_address_collection="required"
-            )
-        else:
+    # Try with Stripe Managed Payments (auto tax). Fall back progressively if the account
+    # doesn't have the required tax registration / head office address configured.
+    session = None
+    for attempt in (
+        {"managed_payments": {"enabled": True}},
+        {"automatic_tax": {"enabled": True}, "billing_address_collection": "required"},
+        {},  # Plain USD-only session — flat $4.99, no auto tax
+    ):
+        try:
+            session = stripe.checkout.Session.create(**kwargs, **attempt)
+            break
+        except stripe.error.InvalidRequestError as e:
+            msg = (getattr(e, "user_message", "") or str(e)).lower()
+            if any(k in msg for k in (
+                "managed payments", "ineligible", "head office",
+                "automatic tax", "tax registration", "not registered",
+            )):
+                logger.info(f"Stripe fallback (attempt {attempt}): {msg[:120]}")
+                continue
             raise
+    if session is None:
+        raise HTTPException(status_code=500, detail="Could not create Stripe Checkout Session")
 
     await db.payment_transactions.insert_one({
         "session_id": session.id,

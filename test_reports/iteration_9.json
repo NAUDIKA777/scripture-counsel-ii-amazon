@@ -1,0 +1,28 @@
+{
+  "summary": "Iteration 9 — Verified USD-only pricing fix on Stripe Checkout. (1) Backend POST /api/payments/checkout with the exact iter-9 payload returns HTTP 200 with checkout_url starting https://checkout.stripe.com/ and session_id starting cs_test_. (2) Stripe Checkout page now displays 'US$4.99 per month' (confirmed via screenshot + JS console: {\"amount\":\"4.99\",\"currencyCode\":\"usd\"}). No EUR / €5.45 anywhere. (3) Full end-to-end purchase with test card 4242 4242 4242 4242 → redirect to /payment/success?session_id=... → access-pill-pro visible on home → new question does NOT reopen paywall. (4) Regression suite (7 pytest tests) all pass: health/payments_configured, checkout creation, payment_status before payment, unknown subscription status, restore unknown email, restore invalid email (422), verse-of-day.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_stripe_flow.py",
+    "/app/test_reports/pytest/iter9_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "adaptive_pricing={'enabled': False} correctly forces USD display for every buyer regardless of geo — verified visually on the Stripe Checkout page (US$4.99) and via Stripe.js console log (currencyCode: usd).",
+    "The 3-tier fallback (managed_payments → automatic_tax → plain) in /api/payments/checkout is defensive and works — the first tier (managed_payments) succeeded in this environment, producing the accordion-style SMP checkout UI (Card / Cash App Pay / Bank as radios). Card fields become accessible after clicking the Card accordion row.",
+    "Note: iteration_8 pre-fix Stripe UI exposed input[name=cardNumber] directly; post-fix under SMP the payment methods are collapsed under an accordion. This is a Stripe SMP UI difference, not a bug, but any future Playwright tests need to click the Card accordion label (label wrapping input#payment-method-accordion-item-title-card) before card fields appear.",
+    "polling-based /api/payments/status flow still works — after redirect back the success page briefly shows 'Verifying your subscription...' then transitions; PRO entitlement is granted once polling resolves."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Anonymous app (no login). Stripe TEST card 4242 4242 4242 4242 / 12/34 / 123 / ZIP 12345. Test emails used: usdtest@example.com (backend curl), usdpurchase-1786667058@example.com (real purchase; Session cs_test_a1YU8KNRz7iUBwkkrphWGwBkpMQJIVxnpNMsNGG0DmCOBpp8iwkJtpZEPZ).",
+  "seed_data_creation": "localStorage 'wisdom_free_counsel_count' = '3' to force paywall. A real Stripe test subscription was created for usdpurchase-1786667058@example.com.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Fix from iteration_9 (adaptive_pricing.enabled=false + fallback chain) is verified working. The active Stripe Checkout in this environment is Stripe Managed Payments (SMP), where Card is a radio in an accordion. To automate card fill, first click the label wrapping input#payment-method-accordion-item-title-card, then wait for input[name=cardNumber] to appear. Prior test subscriptions (iter8: testpurchase-1786666293@example.com, iter9: usdpurchase-1786667058@example.com) exist in Stripe test mode and can be used for restore-flow tests. Do not use page.wait_for_load_state('networkidle') on the Stripe Checkout page — Stripe holds long-poll connections and networkidle never fires. Use domcontentloaded + fixed wait_for_timeout instead.",
+  "rca of the issue": "N/A — no bugs found. The iteration_8 UX inconsistency (€5.45 EUR shown on Stripe) is resolved. Root cause of the prior issue was Stripe's adaptive-pricing feature which auto-converts the price to the buyer's local currency (with VAT for EU). The fix disables adaptive_pricing so every buyer sees the exact USD amount (4.99) that the paywall advertises. Verified via console log: 'Estimated order amount for sandbox is {\"amount\":\"4.99\",\"currencyCode\":\"usd\"}' and visible on-page text 'US$4.99 per month'."
+}
