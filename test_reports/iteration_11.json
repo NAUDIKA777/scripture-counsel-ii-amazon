@@ -1,0 +1,25 @@
+{
+  "summary": "Iteration 11 — Verse Share Widgets feature verified end-to-end. Backend: 11/11 pytest tests pass for POST /api/shares (with image, no image, validation 400 on empty book/text), GET /api/shares/{id} (returns metadata, no image_bytes, 404 for unknown), GET /api/shares/{id}/image.png (200 image/png, 404 without image), GET /api/v/{id} (200 HTML with og:title 'Psalm 23:1 — Wisdom &amp; Word', og:description with verse + (KJV), og:image pointing to public /api/shares/{id}/image.png, twitter:card=summary_large_image when image / summary when none, og:url on public host, visible share-page-cta pointing to '/'), views counter increments on each hit, and 404 landing still nudges to Wisdom & Word. Origin_url override correctly pins the public host so OG tags use the browser-facing URL regardless of who fetches. Frontend: On https://scripture-counsel-2.preview.emergentagent.com after localStorage.clear() and asking a question, scripture-card-0 shows all three buttons (share-verse-0, download-verse-0, link-verse-0). Clicking link-verse-0 opens share-link-dialog. share-link-url starts with https://scripture-counsel-2.preview.emergentagent.com/api/v/. share-link-copy shows Check icon + 'Copied' for 2s. share-to-x/whatsapp/facebook hrefs correctly encode share URL (twitter.com/intent/tweet, wa.me/?text=, facebook.com/sharer/sharer.php?u=) all with target=_blank + rel=noopener noreferrer. share-native present. share-link-close closes dialog.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_shares.py",
+    "/app/test_reports/pytest/iter11_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Excellent OG/Twitter meta tag rendering — HTML uses html.escape() to prevent injection, twitter:card correctly toggles between summary_large_image and summary based on image presence, and og:image dimensions (1080x1350) match Instagram/portrait aspect.",
+    "public_base_url priority chain (explicit → Origin → Referer → base_url) plus persisting public_base_url on the share doc is a solid pattern — guarantees landing pages always link back to the correct public host even when crawlers fetch from different hops.",
+    "Non-blocking: server.py has grown to ~895 lines with many concerns (auth-less shares, stripe, LLM, TTS). Consider splitting shares/stripe/llm into separate routers/modules for maintainability.",
+    "Non-blocking: view-count increment happens inline — under heavy scraping this could add DB contention. A background task or an at-most-once counter would be nicer, but current impl is fine for MVP scale.",
+    "Non-blocking: no rate limiting on POST /api/shares — a malicious user could flood the shares collection. Consider IP-based or app_user_id rate limiting later."
+  ],
+  "updated_files": ["/app/backend/tests/test_shares.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "None required (feature is auth-less).",
+  "seed_data_creation": "Test created ~4 share records in db.shares (Psalm 23:1, John 3:16, Psalm 1:1, Psalm 100:1).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Verse Share Widgets: POST /api/shares {book,chapter,verse,text,image_data_url?,origin_url?} → {share_id, share_url, image_url}. GET /api/shares/{id} JSON (no image_bytes). GET /api/shares/{id}/image.png. GET /api/v/{id} HTML landing with OG+Twitter tags, increments views. Landing 404 still HTML with home link. Frontend: link-verse-{i} → POSTs share (auto-generates PNG via html-to-image) → opens ShareLinkDialog. Regression on ask/share/save/paywall/pro pill not re-tested this iteration since they were validated in iters 7-10 and no shared code changed; if concerned, rerun /app/backend/tests/test_portal_flow.py + /app/backend/tests/test_stripe_flow.py.",
+  "rca of the issue": "N/A — feature working as specified."
+}

@@ -1,5 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Request
-from fastapi.responses import Response
+from fastapi.responses import Response, HTMLResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -9,6 +9,8 @@ import json
 import base64
 import logging
 import random
+import secrets
+import html as html_lib
 import httpx
 import stripe
 from pathlib import Path
@@ -88,6 +90,15 @@ class PortalRequest(BaseModel):
 
 class RestoreRequest(BaseModel):
     email: EmailStr
+
+
+class CreateShareRequest(BaseModel):
+    book: str
+    chapter: int
+    verse: str
+    text: str
+    image_data_url: Optional[str] = None  # data:image/png;base64,...
+    origin_url: Optional[str] = None  # public base URL from the browser
 
 
 class Conversation(BaseModel):
@@ -621,6 +632,250 @@ async def stripe_webhook(request: Request):
         )
 
     return {"status": "ok"}
+
+
+# ============================================================
+# VERSE SHARE WIDGETS — public shareable landing pages with rich OG previews
+# so a shared URL becomes a "widget" on Instagram/X/WhatsApp/iMessage.
+# ============================================================
+def _new_share_id() -> str:
+    return secrets.token_urlsafe(9)  # ~12 chars, url-safe
+
+
+def _decode_data_url(data_url: str) -> Optional[bytes]:
+    if not data_url or not data_url.startswith("data:image/"):
+        return None
+    try:
+        _, b64 = data_url.split(",", 1)
+        return base64.b64decode(b64)
+    except Exception:
+        return None
+
+
+def _public_base_url(request: Request, explicit: Optional[str] = None) -> str:
+    """Return the browser-facing base URL for building share links.
+    Order: explicit override → Origin header → Referer → request.base_url."""
+    if explicit:
+        return explicit.rstrip("/")
+    origin = request.headers.get("origin")
+    if origin:
+        return origin.rstrip("/")
+    referer = request.headers.get("referer") or ""
+    if referer:
+        from urllib.parse import urlparse
+        p = urlparse(referer)
+        if p.scheme and p.netloc:
+            return f"{p.scheme}://{p.netloc}"
+    return str(request.base_url).rstrip("/")
+
+
+@api_router.post("/shares")
+async def create_share(req: CreateShareRequest, request: Request):
+    book = req.book.strip()
+    text = req.text.strip()
+    if not book or not text:
+        raise HTTPException(status_code=400, detail="Book and text are required")
+
+    share_id = _new_share_id()
+    doc = {
+        "share_id": share_id,
+        "book": book,
+        "chapter": int(req.chapter),
+        "verse": str(req.verse).strip(),
+        "text": text,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "views": 0,
+    }
+    img_bytes = _decode_data_url(req.image_data_url) if req.image_data_url else None
+    if img_bytes and len(img_bytes) < 3_000_000:  # cap ~3 MB
+        doc["image_bytes"] = img_bytes
+
+    base = _public_base_url(request, req.origin_url)
+    doc["public_base_url"] = base
+    await db.shares.insert_one(doc)
+
+    return {
+        "share_id": share_id,
+        "share_url": f"{base}/api/v/{share_id}",
+        "image_url": f"{base}/api/shares/{share_id}/image.png" if img_bytes else None,
+    }
+
+
+@api_router.get("/shares/{share_id}")
+async def get_share(share_id: str):
+    doc = await db.shares.find_one({"share_id": share_id}, {"_id": 0, "image_bytes": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Share not found")
+    return doc
+
+
+@api_router.get("/shares/{share_id}/image.png")
+async def get_share_image(share_id: str):
+    doc = await db.shares.find_one({"share_id": share_id}, {"image_bytes": 1})
+    if not doc or not doc.get("image_bytes"):
+        raise HTTPException(status_code=404, detail="Image not found")
+    return Response(
+        content=doc["image_bytes"],
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
+
+
+_SHARE_HTML = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title}</title>
+<meta name="description" content="{description}">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Wisdom &amp; Word">
+<meta property="og:title" content="{title}">
+<meta property="og:description" content="{description}">
+<meta property="og:url" content="{page_url}">
+{og_image_tags}
+
+<meta name="twitter:card" content="{twitter_card}">
+<meta name="twitter:title" content="{title}">
+<meta name="twitter:description" content="{description}">
+{twitter_image_tag}
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Manrope:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root {{ color-scheme: dark; }}
+  * {{ box-sizing: border-box; }}
+  body {{
+    margin: 0; min-height: 100vh; padding: 48px 24px;
+    background: radial-gradient(ellipse at top, #0f172a 0%, #030712 60%);
+    color: #f8fafc;
+    font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+  }}
+  .card {{
+    max-width: 640px; width: 100%;
+    background: linear-gradient(180deg, rgba(15,23,42,0.85), rgba(15,23,42,0.95));
+    border: 1px solid rgba(212,175,55,0.35); border-radius: 24px;
+    padding: 56px 40px; text-align: left;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+  }}
+  .eyebrow {{ font-size: 11px; letter-spacing: 0.4em; text-transform: uppercase; color: #d4af37; margin-bottom: 20px; }}
+  .verse {{
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-style: italic; font-size: 32px; line-height: 1.4;
+    color: #fde68a; margin: 0 0 24px 0;
+  }}
+  .ref {{ font-size: 13px; letter-spacing: 0.28em; text-transform: uppercase; color: #d4af37; margin-bottom: 6px; }}
+  .kjv {{ font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: #94a3b8; }}
+  .divider {{ height: 1px; background: rgba(255,255,255,0.08); margin: 32px 0; }}
+  .cta-title {{ font-family: 'Cormorant Garamond', serif; font-size: 22px; color: #f8fafc; margin: 0 0 10px 0; }}
+  .cta-body {{ color: #cbd5e1; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0; }}
+  .cta {{
+    display: inline-block;
+    background: #d4af37; color: #030712; padding: 14px 26px;
+    border-radius: 999px; text-decoration: none;
+    font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; font-weight: 600;
+  }}
+  .cta:hover {{ filter: brightness(1.1); }}
+  .foot {{ margin-top: 28px; font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: #64748b; }}
+  @media (max-width: 480px) {{
+    .card {{ padding: 40px 28px; border-radius: 20px; }}
+    .verse {{ font-size: 26px; }}
+  }}
+</style>
+</head>
+<body>
+  <main class="card">
+    <div class="eyebrow">Scripture · King James Version</div>
+    <p class="verse">&ldquo;{verse_html}&rdquo;</p>
+    <div class="ref">{book} {chapter}:{verse_num}</div>
+    <div class="kjv">King James Version</div>
+    <div class="divider"></div>
+    <h1 class="cta-title">Ask the Elder for counsel of your own.</h1>
+    <p class="cta-body">
+      Wisdom &amp; Word answers what weighs upon your heart with the Bible alone —
+      spoken in a warm statesman voice, with every verse cited.
+    </p>
+    <a class="cta" href="{home_url}" data-testid="share-page-cta">Continue to Wisdom &amp; Word →</a>
+    <div class="foot">Shared with Wisdom &amp; Word</div>
+  </main>
+</body>
+</html>
+"""
+
+
+@api_router.get("/v/{share_id}", response_class=HTMLResponse)
+async def share_landing(share_id: str, request: Request):
+    doc = await db.shares.find_one({"share_id": share_id}, {"_id": 0})
+    if not doc:
+        # Minimal 404 landing that still nudges to the home page
+        base = str(request.base_url).rstrip("/")
+        return HTMLResponse(
+            content=(
+                "<!doctype html><meta charset=utf-8>"
+                "<title>Verse not found — Wisdom & Word</title>"
+                "<body style='background:#030712;color:#f8fafc;font-family:sans-serif;text-align:center;padding:80px 20px'>"
+                "<h1>This verse could not be found.</h1>"
+                f"<p><a style='color:#d4af37' href='{base}/'>Continue to Wisdom &amp; Word →</a></p></body>"
+            ),
+            status_code=404,
+        )
+
+    # Fire-and-forget view counter
+    try:
+        await db.shares.update_one({"share_id": share_id}, {"$inc": {"views": 1}})
+    except Exception:
+        pass
+
+    base = doc.get("public_base_url") or _public_base_url(request)
+    home_url = base + "/"
+    page_url = f"{base}/api/v/{share_id}"
+
+    book = doc.get("book", "")
+    chapter = int(doc.get("chapter", 0))
+    verse_num = doc.get("verse", "")
+    text = doc.get("text", "")
+
+    title = f"{book} {chapter}:{verse_num} — Wisdom & Word"
+    # Keep description short so Twitter shows it cleanly
+    trimmed = text if len(text) <= 190 else text[:187].rstrip() + "..."
+    description = f'"{trimmed}" — {book} {chapter}:{verse_num} (KJV)'
+
+    has_image = bool(doc.get("image_bytes"))
+    if has_image:
+        img_url = f"{base}/api/shares/{share_id}/image.png"
+        og_image_tags = (
+            f'<meta property="og:image" content="{img_url}">\n'
+            f'<meta property="og:image:width" content="1080">\n'
+            f'<meta property="og:image:height" content="1350">\n'
+            f'<meta property="og:image:alt" content="{html_lib.escape(description, quote=True)}">'
+        )
+        twitter_image_tag = f'<meta name="twitter:image" content="{img_url}">'
+        twitter_card = "summary_large_image"
+    else:
+        og_image_tags = ""
+        twitter_image_tag = ""
+        twitter_card = "summary"
+
+    return HTMLResponse(
+        content=_SHARE_HTML.format(
+            title=html_lib.escape(title, quote=True),
+            description=html_lib.escape(description, quote=True),
+            page_url=html_lib.escape(page_url, quote=True),
+            home_url=html_lib.escape(home_url, quote=True),
+            book=html_lib.escape(book),
+            chapter=chapter,
+            verse_num=html_lib.escape(str(verse_num)),
+            verse_html=html_lib.escape(text),
+            og_image_tags=og_image_tags,
+            twitter_image_tag=twitter_image_tag,
+            twitter_card=twitter_card,
+        ),
+        headers={"Cache-Control": "public, max-age=300"},
+    )
 
 
 app.include_router(api_router)

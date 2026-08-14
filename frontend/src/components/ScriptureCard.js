@@ -1,13 +1,19 @@
 import React, { useRef, useState } from "react";
+import axios from "axios";
 import { toast } from "sonner";
-import { Quote, Share2, Download, Loader2, Check } from "lucide-react";
+import { Quote, Share2, Download, Loader2, Check, Link2 } from "lucide-react";
 import { toPng } from "html-to-image";
 import ShareableVerse from "@/components/ShareableVerse";
+import ShareLinkDialog from "@/components/ShareLinkDialog";
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export default function ScriptureCard({ reference, index }) {
   const shareRef = useRef(null);
   const [busy, setBusy] = useState(false);
+  const [linking, setLinking] = useState(false);
   const [justCopied, setJustCopied] = useState(false);
+  const [linkDialog, setLinkDialog] = useState({ open: false, url: "" });
 
   const filename = () =>
     `${reference.book}-${reference.chapter}-${String(reference.verse).replace(/[^\d]/g, "-")}.png`.toLowerCase();
@@ -93,6 +99,28 @@ export default function ScriptureCard({ reference, index }) {
     }
   };
 
+  const onGetLink = async () => {
+    setLinking(true);
+    try {
+      const dataUrl = await generatePng();
+      const payload = {
+        book: reference.book,
+        chapter: reference.chapter,
+        verse: String(reference.verse),
+        text: reference.text,
+        image_data_url: dataUrl,
+        origin_url: window.location.origin,
+      };
+      const res = await axios.post(`${API}/shares`, payload);
+      setLinkDialog({ open: true, url: res.data.share_url });
+    } catch (e) {
+      console.error(e);
+      toast.error(e?.response?.data?.detail || "Could not create the shareable link.");
+    } finally {
+      setLinking(false);
+    }
+  };
+
   return (
     <div
       data-testid={`scripture-card-${index}`}
@@ -134,7 +162,29 @@ export default function ScriptureCard({ reference, index }) {
           <Download className="w-3.5 h-3.5" strokeWidth={2} />
           <span>Save</span>
         </button>
+        <button
+          onClick={onGetLink}
+          disabled={linking}
+          data-testid={`link-verse-${index}`}
+          className="ml-auto inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs uppercase tracking-widest text-slate-400 hover:text-amber-100 disabled:opacity-50"
+          title="Get shareable link"
+        >
+          {linking ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={2} />
+          ) : (
+            <Link2 className="w-3.5 h-3.5" strokeWidth={2} />
+          )}
+          <span>Get Link</span>
+        </button>
       </div>
+
+      <ShareLinkDialog
+        open={linkDialog.open}
+        onClose={() => setLinkDialog({ open: false, url: "" })}
+        shareUrl={linkDialog.url}
+        verseRef={`${reference.book} ${reference.chapter}:${reference.verse}`}
+        verseText={reference.text}
+      />
 
       {/* Off-screen render target for image capture — 0x0 wrapper hides the 1080x1350 inside */}
       <div
