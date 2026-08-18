@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy Policy — Wisdom &amp; Word</title>
+<meta name="description" content="How Wisdom & Word handles your data. Simple, honest, minimal.">
+<meta name="robots" content="index,follow">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0;
+    background: #030712; color: #f8fafc;
+    font-family: 'Manrope', system-ui, -apple-system, sans-serif;
+    line-height: 1.75; font-size: 16px;
+  }
+  a { color: #d4af37; text-decoration: none; border-bottom: 1px solid rgba(212,175,55,0.35); }
+  a:hover { border-bottom-color: #d4af37; }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 80px 24px 100px; position: relative; }
+  header { text-align: center; margin-bottom: 64px; padding-bottom: 40px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .eyebrow { font-size: 11px; letter-spacing: 0.4em; text-transform: uppercase; color: #d4af37; margin-bottom: 20px; }
+  h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 500; font-size: clamp(40px, 6vw, 60px); line-height: 1.05; margin: 0 0 16px 0; letter-spacing: -0.01em; }
+  h1 .italic { font-style: italic; color: #d4af37; }
+  .meta { color: #94a3b8; font-size: 13px; letter-spacing: 0.15em; text-transform: uppercase; }
+  h2 { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 500; font-size: 28px; margin: 48px 0 16px 0; color: #f8fafc; }
+  h3 { font-family: 'Manrope', sans-serif; font-weight: 600; font-size: 15px; text-transform: uppercase; letter-spacing: 0.2em; color: #d4af37; margin: 32px 0 12px 0; }
+  p, li { color: #cbd5e1; }
+  ul { padding-left: 20px; }
+  li { margin-bottom: 8px; }
+  strong { color: #f8fafc; font-weight: 600; }
+  .callout {
+    background: rgba(212,175,55,0.06); border: 1px solid rgba(212,175,55,0.3); border-radius: 14px;
+    padding: 22px 26px; margin: 32px 0; font-size: 15px;
+  }
+  hr { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 56px 0; }
+  footer { margin-top: 64px; padding-top: 32px; border-top: 1px solid rgba(255,255,255,0.08); text-align: center; font-size: 11px; letter-spacing: 0.28em; text-transform: uppercase; color: #64748b; }
+  footer a { color: #94a3b8; border-bottom: none; }
+  footer a:hover { color: #d4af37; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">Wisdom &amp; Word</div>
+  <h1>Privacy <span class="italic">Policy</span></h1>
+  <div class="meta">Last updated: 18 August 2026 · Effective immediately</div>
+</header>
+
+<p>This policy explains what information Wisdom &amp; Word ("we", "us", "the app") collects when you use our website and mobile app, why we collect it, and the choices you have. We keep things minimal on purpose.</p>
+
+<div class="callout">
+  <strong>Short version:</strong> You can use Wisdom &amp; Word without creating an account. We store an anonymous browser ID so you can pick up where you left off, and we send your questions to a Bible-focused AI so it can respond. If you subscribe, Stripe processes your payment — we never see your card. If you ask us to read counsel aloud, ElevenLabs converts the text to speech. That's it.
+</div>
+
+<h2>1. Who we are</h2>
+<p>Wisdom &amp; Word is operated by the stewards of the wisdominword.com service. For any privacy question, write to <a href="mailto:privacy@wisdominword.com">privacy@wisdominword.com</a>.</p>
+
+<h2>2. What we collect &amp; why</h2>
+
+<h3>2.1 Anonymous session identifier</h3>
+<p>When you open Wisdom &amp; Word, we generate a random anonymous ID (for example, <code>anon-a3f4-9b12</code>) and store it in your browser's local storage under the key <code>wisdom_user_id</code>. This lets you continue a session, receive counsel history, and — if you subscribe — keep your Pro status.</p>
+<ul>
+  <li><strong>What it is:</strong> a random string. It is not tied to your name, email, phone, IP, or device fingerprint.</li>
+  <li><strong>Where it lives:</strong> your browser only, plus our database when linked to a subscription.</li>
+  <li><strong>How to clear it:</strong> clear your browser's site data for wisdominword.com. This will start a fresh anonymous session.</li>
+</ul>
+
+<h3>2.2 Questions and counsel</h3>
+<p>When you ask a question, the text of that question is sent to our servers and forwarded to a large-language-model provider (currently <strong>Anthropic Claude</strong>, accessed via Emergent) so it can generate a Bible-grounded response. Both your question and the counsel returned are stored in our database, associated with your anonymous session ID, so you can revisit past reflections.</p>
+<ul>
+  <li>We do not use your questions to train AI models.</li>
+  <li>Anthropic's own retention policy applies to data in transit through their API. See <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener noreferrer">Anthropic's Privacy Policy</a>.</li>
+</ul>
+
+<h3>2.3 Voice playback (optional)</h3>
+<p>When you tap "Listen" on a counsel, the answer text is sent to <strong>ElevenLabs</strong> which converts it to speech and returns an MP3 stream. We do not store the audio. See <a href="https://elevenlabs.io/privacy" target="_blank" rel="noopener noreferrer">ElevenLabs' Privacy Policy</a>.</p>
+
+<h3>2.4 Payments (optional, only if you subscribe)</h3>
+<p>Subscriptions are processed by <strong>Stripe</strong>. When you subscribe, you enter your payment details on Stripe's secure checkout page — <strong>we never see or store your card number, CVC, or full billing address</strong>. Stripe returns to us only a customer ID, subscription ID, and (if you provided one) your email. See <a href="https://stripe.com/privacy" target="_blank" rel="noopener noreferrer">Stripe's Privacy Policy</a>.</p>
+
+<h3>2.5 Email (optional)</h3>
+<p>If you enter an email address at checkout, we store it so you can restore your subscription in another browser and so Stripe can send receipts. Providing an email is optional. We do not send marketing emails.</p>
+
+<h3>2.6 Shared verse pages</h3>
+<p>If you click "Get Link" on a verse, we create a public shareable landing page with that verse and — if you allowed it — the image you generated. That page is intentionally public (anyone with the link can view it). We keep a simple view counter but do not identify who viewed it.</p>
+
+<h3>2.7 Basic analytics</h3>
+<p>We use <strong>PostHog</strong> to understand aggregate usage — for example, how many people ask a first question, complete a subscription, or hit an error. PostHog respects your Do Not Track preference where applicable. See <a href="https://posthog.com/privacy" target="_blank" rel="noopener noreferrer">PostHog's Privacy Policy</a>.</p>
+
+<h3>2.8 Technical logs</h3>
+<p>Our servers keep short-lived request logs (IP, timestamp, path) for security and abuse-prevention. These logs are automatically rotated and are not tied to your anonymous session ID.</p>
+
+<h2>3. What we do <em>not</em> collect</h2>
+<ul>
+  <li>Your name, phone number, home address, or government ID</li>
+  <li>Your location</li>
+  <li>Access to contacts, photos, camera, microphone, or files</li>
+  <li>Advertising identifiers or third-party ad-tracking data</li>
+  <li>Health, biometric, or financial information beyond the Stripe payment flow</li>
+</ul>
+<p>The Wisdom &amp; Word Android and iOS apps request <strong>no runtime permissions</strong> beyond standard network access.</p>
+
+<h2>4. Who we share with</h2>
+<p>We share only what is necessary to run the service, with the processors named above:</p>
+<ul>
+  <li><strong>Anthropic</strong> (via Emergent) — receives your question text to generate counsel</li>
+  <li><strong>ElevenLabs</strong> — receives counsel text to generate voice, only if you tap Listen</li>
+  <li><strong>Stripe</strong> — processes your payment, only if you subscribe</li>
+  <li><strong>MongoDB Atlas / hosting provider</strong> — stores your session data</li>
+  <li><strong>PostHog</strong> — receives anonymous product analytics</li>
+</ul>
+<p>We do not sell your data. We do not share your data with advertisers.</p>
+
+<h2>5. Data retention</h2>
+<ul>
+  <li><strong>Conversation history:</strong> retained while your anonymous session ID exists. Clearing your browser storage effectively orphans the data.</li>
+  <li><strong>Subscription records:</strong> retained for tax, accounting, and refund purposes as required by law (typically 7 years).</li>
+  <li><strong>Shared verse pages:</strong> retained indefinitely unless you request deletion.</li>
+  <li><strong>Server logs:</strong> rotated within 30 days.</li>
+</ul>
+
+<h2>6. Your rights</h2>
+<p>Depending on where you live (EU/UK GDPR, California CCPA, Virginia, etc.) you have rights to access, correct, delete, or export your data. To exercise any of these rights, email <a href="mailto:privacy@wisdominword.com">privacy@wisdominword.com</a> from the address associated with your subscription (or include your anonymous session ID if you have not subscribed). We respond within 30 days.</p>
+<p>You may also cancel your subscription at any time from within the app (Manage Subscription → Cancel) or from the Stripe portal — this stops future billing immediately and ends Pro access at the end of the paid period.</p>
+
+<h2>7. Children</h2>
+<p>Wisdom &amp; Word is intended for adults. We do not knowingly collect data from children under 13 (or under 16 in the EU). If you believe a child has provided us data, contact <a href="mailto:privacy@wisdominword.com">privacy@wisdominword.com</a> and we will delete it.</p>
+
+<h2>8. Security</h2>
+<p>All communication with our servers is encrypted in transit via HTTPS. Payments are handled entirely by Stripe using PCI-compliant infrastructure. No system is perfectly secure — but we do not store card data, do not collect sensitive personal information, and keep the data we do hold to the minimum required.</p>
+
+<h2>9. International transfers</h2>
+<p>Our providers may process data in the United States, the European Union, or other jurisdictions. By using Wisdom &amp; Word you consent to your data being transferred, stored, and processed in those regions.</p>
+
+<h2>10. Changes to this policy</h2>
+<p>We may update this policy from time to time. Material changes will be reflected in the "Last updated" date at the top of this page. Continued use of Wisdom &amp; Word after a change indicates acceptance of the revised policy.</p>
+
+<h2>11. Contact</h2>
+<p>Questions, requests, or complaints:<br>
+📧 <a href="mailto:privacy@wisdominword.com">privacy@wisdominword.com</a></p>
+
+<hr>
+
+<footer>
+  <a href="/">← Back to Wisdom &amp; Word</a>
+</footer>
+
+</div>
+</body>
+</html>
