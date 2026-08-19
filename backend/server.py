@@ -59,6 +59,16 @@ class ScriptureRef(BaseModel):
     text: str
 
 
+class ScriptureLocation(BaseModel):
+    """A biblical/ancient geographical location referenced in the counsel."""
+    ancient_name: str          # e.g., "Ephesus", "Mount Sinai", "Sea of Galilee"
+    significance: str          # 1-2 concise sentences of biblical/historical significance
+    modern_name: str           # e.g., "Near modern-day Selçuk, Turkey"
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    map_query: str             # search string safe for any map API, e.g., "Ephesus ancient ruins, Turkey"
+
+
 class AskRequest(BaseModel):
     question: str
     session_id: Optional[str] = None
@@ -70,6 +80,7 @@ class AskResponse(BaseModel):
     question: str
     answer: str
     references: List[ScriptureRef] = []
+    locations: List[ScriptureLocation] = []
     created_at: str
 
 
@@ -108,6 +119,7 @@ class Conversation(BaseModel):
     question: str
     answer: str
     references: List[ScriptureRef] = []
+    locations: List[ScriptureLocation] = []
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
@@ -123,12 +135,25 @@ STRICT RULES:
 4. Speak directly to the person's heart. Address them warmly (e.g., "Dear friend,", "Beloved,", "My child,") — but sparingly, never repeatedly.
 5. Keep the counsel between 120 and 250 words. Be substantive but not verbose. Every sentence should carry weight.
 
+LOCATION DETECTION:
+6. If any cited verse, referenced passage, or the counsel itself mentions a specific geographical place — a named city (Jerusalem, Corinth, Ephesus, Bethlehem, Damascus, Rome, Nineveh), mountain (Mount Sinai, Mount of Olives, Mount Carmel, Golgotha), body of water (Sea of Galilee, Jordan River, Red Sea, Dead Sea), or ancient region (Judea, Galatia, Samaria, Babylon) — you MUST include it in the "locations" array of your response.
+7. Only include locations that actually appear in the Scripture you cite or in the counsel prose. Do NOT invent locations. If nothing geographic is referenced, return an empty "locations" array.
+8. For each location provide:
+   - "ancient_name": the biblical / ancient name as it appears in the KJV (e.g., "Ephesus", "Mount Sinai")
+   - "significance": 1–2 concise sentences on what happened there biblically or its role in Scripture
+   - "modern_name": current city / region and modern country (e.g., "Near modern-day Selçuk, Turkey")
+   - "lat" and "lng": approximate decimal coordinates ONLY if you are confident (e.g., Jerusalem ≈ 31.7683, 35.2137). If uncertain, omit these fields entirely rather than guess.
+   - "map_query": a plain-English search string safe for any mapping API (e.g., "Ephesus ancient ruins, Selçuk, Turkey" or "Sea of Galilee, Israel")
+
 RESPONSE FORMAT — you MUST return valid JSON ONLY, no markdown fences, no prose outside the JSON:
 {
   "answer": "Your warm, statesman-like counsel here (120-250 words). Reference Scripture naturally within the prose using book names but do not paste the full verse text — that goes in 'references'.",
   "references": [
     {"book": "Philippians", "chapter": 4, "verse": "6-7", "text": "Be careful for nothing; but in every thing by prayer and supplication with thanksgiving let your requests be made known unto God. And the peace of God, which passeth all understanding, shall keep your hearts and minds through Christ Jesus."},
     {"book": "Psalm", "chapter": 34, "verse": "18", "text": "The LORD is nigh unto them that are of a broken heart; and saveth such as be of a contrite spirit."}
+  ],
+  "locations": [
+    {"ancient_name": "Philippi", "significance": "The Roman colony in Macedonia where Paul planted a beloved church and later wrote his letter to them from prison.", "modern_name": "Near modern-day Filippoi, Greece", "lat": 41.0136, "lng": 24.2870, "map_query": "Philippi archaeological site, Greece"}
   ]
 }
 
@@ -197,7 +222,27 @@ async def ask_the_elder(question: str, session_id: str) -> dict:
         except Exception as e:
             logger.warning(f"Skipping malformed reference {r}: {e}")
 
-    return {"answer": data["answer"].strip(), "references": refs}
+    # Validate locations shape (optional field — safe if missing)
+    locations = []
+    for loc in data.get("locations", []) or []:
+        try:
+            ancient = str(loc.get("ancient_name", "")).strip()
+            if not ancient:
+                continue
+            lat = loc.get("lat")
+            lng = loc.get("lng")
+            locations.append(ScriptureLocation(
+                ancient_name=ancient,
+                significance=str(loc.get("significance", "")).strip(),
+                modern_name=str(loc.get("modern_name", "")).strip(),
+                lat=float(lat) if isinstance(lat, (int, float)) else None,
+                lng=float(lng) if isinstance(lng, (int, float)) else None,
+                map_query=str(loc.get("map_query") or ancient).strip(),
+            ))
+        except Exception as e:
+            logger.warning(f"Skipping malformed location {loc}: {e}")
+
+    return {"answer": data["answer"].strip(), "references": refs, "locations": locations}
 
 
 # ============================================================
@@ -260,6 +305,7 @@ async def ask(req: AskRequest):
         question=req.question.strip(),
         answer=result["answer"],
         references=result["references"],
+        locations=result.get("locations", []),
     )
     doc = conv.model_dump()
     await db.conversations.insert_one(doc)
@@ -270,6 +316,7 @@ async def ask(req: AskRequest):
         question=conv.question,
         answer=conv.answer,
         references=conv.references,
+        locations=conv.locations,
         created_at=conv.created_at,
     )
 

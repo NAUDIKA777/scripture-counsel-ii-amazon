@@ -3,6 +3,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import { Volume2, Pause, Loader2 } from "lucide-react";
 import ScriptureCard from "@/components/ScriptureCard";
+import LocationCard from "@/components/LocationCard";
 
 const audioBars = [0, 1, 2, 3, 4];
 
@@ -133,6 +134,20 @@ export default function ConversationCard({ convo, api }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-8">
             {convo.references.map((r, i) => (
               <ScriptureCard key={i} reference={r} index={i} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Locations referenced in Scripture */}
+      {convo.locations?.length > 0 && (
+        <div className="mt-8" data-testid="scripture-locations">
+          <div className="text-[10px] uppercase tracking-[0.35em] text-slate-500 mb-4 pl-8">
+            Places in Scripture
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-8">
+            {convo.locations.map((loc, i) => (
+              <LocationCard key={i} location={loc} index={i} />
             ))}
           </div>
         </div>
