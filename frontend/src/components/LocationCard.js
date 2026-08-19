@@ -17,6 +17,7 @@ export default function LocationCard({ location, index }) {
     lat,
     lng,
     map_query,
+    display_name,
   } = location;
 
   const hasCoords = typeof lat === "number" && typeof lng === "number";
@@ -51,6 +52,16 @@ export default function LocationCard({ location, index }) {
           {significance && (
             <p className="text-sm text-slate-300 mt-3 leading-relaxed">
               {significance}
+            </p>
+          )}
+
+          {display_name && (
+            <p
+              className="text-[11px] text-slate-500 mt-3 leading-relaxed italic"
+              data-testid={`location-display-name-${index}`}
+              title="Canonical name from OpenStreetMap"
+            >
+              {display_name}
             </p>
           )}
 

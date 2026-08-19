@@ -66,7 +66,8 @@ class ScriptureLocation(BaseModel):
     modern_name: str           # e.g., "Near modern-day Selçuk, Turkey"
     lat: Optional[float] = None
     lng: Optional[float] = None
-    map_query: str             # search string safe for any map API, e.g., "Ephesus ancient ruins, Turkey"
+    map_query: str             # search string safe for any map API
+    display_name: Optional[str] = None  # canonical name from Nominatim geocoder
 
 
 class AskRequest(BaseModel):
@@ -175,6 +176,91 @@ DAILY_VERSES = [
     {"book": "Lamentations", "chapter": 3, "verse": "22-23", "text": "It is of the LORD's mercies that we are not consumed, because his compassions fail not. They are new every morning: great is thy faithfulness."},
     {"book": "1 Peter", "chapter": 5, "verse": "7", "text": "Casting all your care upon him; for he careth for you."},
 ]
+
+
+# ============================================================
+# NOMINATIM (OpenStreetMap) geocoding
+# ============================================================
+NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+NOMINATIM_USER_AGENT = "WisdomAndWordApp/1.0 (contact@wisdomandword.com)"
+
+
+async def _nominatim_geocode(query: str) -> Optional[dict]:
+    """Look up a place via Nominatim. Cached in Mongo so biblical locations are
+    geocoded at most once. Respects Nominatim's User-Agent requirement and
+    1-request-per-second policy via sequential calls at the caller level."""
+    q = (query or "").strip()
+    if not q:
+        return None
+
+    key = q.lower()
+    cached = await db.geocode_cache.find_one({"query": key}, {"_id": 0})
+    if cached:
+        return cached.get("result")
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(
+                NOMINATIM_URL,
+                params={"q": q, "format": "json", "limit": 1},
+                headers={
+                    "User-Agent": NOMINATIM_USER_AGENT,
+                    "Accept": "application/json",
+                    "Accept-Language": "en",
+                },
+            )
+        if r.status_code != 200:
+            logger.warning(f"Nominatim {r.status_code} for '{q}': {r.text[:120]}")
+            return None
+        data = r.json()
+        if not data:
+            # Cache the miss so we don't hammer the API for the same unknown query
+            await db.geocode_cache.update_one(
+                {"query": key},
+                {"$set": {"query": key, "result": None,
+                          "updated_at": datetime.now(timezone.utc).isoformat()}},
+                upsert=True,
+            )
+            return None
+        first = data[0]
+        result = {
+            "lat": float(first["lat"]),
+            "lng": float(first["lon"]),
+            "display_name": first.get("display_name"),
+        }
+        await db.geocode_cache.update_one(
+            {"query": key},
+            {"$set": {"query": key, "result": result,
+                      "updated_at": datetime.now(timezone.utc).isoformat()}},
+            upsert=True,
+        )
+        return result
+    except Exception as e:
+        logger.warning(f"Nominatim lookup failed for '{q}': {e}")
+        return None
+
+
+async def _enrich_locations(locations: List[ScriptureLocation]) -> List[ScriptureLocation]:
+    """Fill in missing lat/lng and add a canonical display_name via Nominatim.
+    Called sequentially with a short delay to respect the 1 req/sec policy."""
+    import asyncio
+    enriched: List[ScriptureLocation] = []
+    for i, loc in enumerate(locations):
+        q = loc.map_query or loc.ancient_name
+        needs_lookup = (loc.lat is None or loc.lng is None) or not loc.display_name
+        result = await _nominatim_geocode(q) if needs_lookup else None
+        if result:
+            enriched.append(loc.model_copy(update={
+                "lat": loc.lat if loc.lat is not None else result.get("lat"),
+                "lng": loc.lng if loc.lng is not None else result.get("lng"),
+                "display_name": loc.display_name or result.get("display_name"),
+            }))
+        else:
+            enriched.append(loc)
+        # Stagger uncached lookups to respect Nominatim's rate limit
+        if needs_lookup and i < len(locations) - 1:
+            await asyncio.sleep(1.0)
+    return enriched
 
 
 # ============================================================
@@ -299,6 +385,13 @@ async def ask(req: AskRequest):
     except Exception as e:
         logger.exception("LLM call failed")
         raise HTTPException(status_code=500, detail=f"Counsel could not be generated: {e}")
+
+    # Enrich locations with Nominatim (cached in Mongo — fast after first lookup)
+    if result.get("locations"):
+        try:
+            result["locations"] = await _enrich_locations(result["locations"])
+        except Exception as e:
+            logger.warning(f"Location enrichment failed (non-fatal): {e}")
 
     conv = Conversation(
         session_id=session_id,
