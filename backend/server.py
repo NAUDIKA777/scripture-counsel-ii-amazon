@@ -67,7 +67,9 @@ class ScriptureLocation(BaseModel):
     lat: Optional[float] = None
     lng: Optional[float] = None
     map_query: str             # search string safe for any map API
-    display_name: Optional[str] = None  # canonical name from Nominatim geocoder
+    image_url: Optional[str] = None   # high-quality photo from Wikimedia
+    wiki_url: Optional[str] = None    # source Wikipedia page (for attribution)
+    wiki_extract: Optional[str] = None  # short encyclopedic blurb for hover / accessibility
 
 
 class AskRequest(BaseModel):
@@ -179,87 +181,110 @@ DAILY_VERSES = [
 
 
 # ============================================================
-# NOMINATIM (OpenStreetMap) geocoding
+# WIKIMEDIA IMAGE LOOKUP — free, no API key needed.
+# Uses Wikipedia's REST summary endpoint which returns a thumbnail (sourced
+# from Wikimedia Commons) plus a canonical page URL for attribution.
 # ============================================================
-NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
-NOMINATIM_USER_AGENT = "WisdomAndWordApp/1.0 (contact@wisdomandword.com)"
+WIKI_SUMMARY_URL = "https://en.wikipedia.org/api/rest_v1/page/summary/{title}"
+WIKI_SEARCH_URL = "https://en.wikipedia.org/w/api.php"
+WIKI_USER_AGENT = "WisdomAndWordApp/1.0 (contact@wisdomandword.com)"
 
 
-async def _nominatim_geocode(query: str) -> Optional[dict]:
-    """Look up a place via Nominatim. Cached in Mongo so biblical locations are
-    geocoded at most once. Respects Nominatim's User-Agent requirement and
-    1-request-per-second policy via sequential calls at the caller level."""
+async def _wiki_lookup(query: str) -> Optional[dict]:
+    """Return {image_url, wiki_url, wiki_extract} for a biblical place, using
+    the Wikipedia REST API. Cached in Mongo — biblical places are stable."""
     q = (query or "").strip()
     if not q:
         return None
 
     key = q.lower()
-    cached = await db.geocode_cache.find_one({"query": key}, {"_id": 0})
+    cached = await db.location_images.find_one({"query": key}, {"_id": 0})
     if cached:
         return cached.get("result")
 
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            r = await client.get(
-                NOMINATIM_URL,
-                params={"q": q, "format": "json", "limit": 1},
-                headers={
-                    "User-Agent": NOMINATIM_USER_AGENT,
-                    "Accept": "application/json",
-                    "Accept-Language": "en",
-                },
-            )
-        if r.status_code != 200:
-            logger.warning(f"Nominatim {r.status_code} for '{q}': {r.text[:120]}")
-            return None
-        data = r.json()
-        if not data:
-            # Cache the miss so we don't hammer the API for the same unknown query
-            await db.geocode_cache.update_one(
-                {"query": key},
-                {"$set": {"query": key, "result": None,
-                          "updated_at": datetime.now(timezone.utc).isoformat()}},
-                upsert=True,
-            )
-            return None
-        first = data[0]
-        result = {
-            "lat": float(first["lat"]),
-            "lng": float(first["lon"]),
-            "display_name": first.get("display_name"),
-        }
-        await db.geocode_cache.update_one(
+    headers = {
+        "User-Agent": WIKI_USER_AGENT,
+        "Accept": "application/json",
+        "Accept-Language": "en",
+    }
+
+    async def store(result: Optional[dict]) -> Optional[dict]:
+        await db.location_images.update_one(
             {"query": key},
             {"$set": {"query": key, "result": result,
                       "updated_at": datetime.now(timezone.utc).isoformat()}},
             upsert=True,
         )
         return result
+
+    try:
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+            # First: direct title lookup (fast path — most biblical places have exact pages)
+            title = q.replace(" ", "_")
+            r = await client.get(WIKI_SUMMARY_URL.format(title=title), headers=headers)
+            if r.status_code == 404:
+                # Fallback: search for the best matching page title, then fetch it
+                sr = await client.get(
+                    WIKI_SEARCH_URL,
+                    params={"action": "query", "list": "search", "srsearch": q,
+                            "srlimit": 1, "format": "json"},
+                    headers=headers,
+                )
+                if sr.status_code == 200:
+                    hits = sr.json().get("query", {}).get("search", [])
+                    if hits:
+                        best = hits[0]["title"].replace(" ", "_")
+                        r = await client.get(WIKI_SUMMARY_URL.format(title=best), headers=headers)
+
+            if r.status_code != 200:
+                logger.info(f"Wikipedia {r.status_code} for '{q}'")
+                return await store(None)
+
+            data = r.json()
+
+            # Prefer the original (full-size) image; fall back to thumbnail
+            image_url = None
+            orig = data.get("originalimage") or {}
+            thumb = data.get("thumbnail") or {}
+            if orig.get("source"):
+                image_url = orig["source"]
+            elif thumb.get("source"):
+                image_url = thumb["source"]
+
+            wiki_url = (data.get("content_urls", {}) or {}).get("desktop", {}).get("page")
+            extract = data.get("extract")
+
+            if not image_url:
+                return await store(None)
+
+            return await store({
+                "image_url": image_url,
+                "wiki_url": wiki_url,
+                "wiki_extract": extract[:220] if extract else None,
+            })
     except Exception as e:
-        logger.warning(f"Nominatim lookup failed for '{q}': {e}")
+        logger.warning(f"Wikipedia lookup failed for '{q}': {e}")
         return None
 
 
 async def _enrich_locations(locations: List[ScriptureLocation]) -> List[ScriptureLocation]:
-    """Fill in missing lat/lng and add a canonical display_name via Nominatim.
-    Called sequentially with a short delay to respect the 1 req/sec policy."""
-    import asyncio
+    """Attach Wikimedia photos + attribution URLs to each location.
+    Uses ancient_name first, then falls back to map_query. Cached in Mongo,
+    so each biblical place is looked up at most once."""
     enriched: List[ScriptureLocation] = []
-    for i, loc in enumerate(locations):
-        q = loc.map_query or loc.ancient_name
-        needs_lookup = (loc.lat is None or loc.lng is None) or not loc.display_name
-        result = await _nominatim_geocode(q) if needs_lookup else None
+    for loc in locations:
+        if loc.image_url:
+            enriched.append(loc)
+            continue
+        result = await _wiki_lookup(loc.ancient_name) or await _wiki_lookup(loc.map_query)
         if result:
             enriched.append(loc.model_copy(update={
-                "lat": loc.lat if loc.lat is not None else result.get("lat"),
-                "lng": loc.lng if loc.lng is not None else result.get("lng"),
-                "display_name": loc.display_name or result.get("display_name"),
+                "image_url": result.get("image_url"),
+                "wiki_url": result.get("wiki_url"),
+                "wiki_extract": result.get("wiki_extract"),
             }))
         else:
             enriched.append(loc)
-        # Stagger uncached lookups to respect Nominatim's rate limit
-        if needs_lookup and i < len(locations) - 1:
-            await asyncio.sleep(1.0)
     return enriched
 
 
