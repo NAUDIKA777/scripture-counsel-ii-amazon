@@ -61,15 +61,24 @@ class ScriptureRef(BaseModel):
 
 class ScriptureLocation(BaseModel):
     """A biblical/ancient geographical location referenced in the counsel."""
-    ancient_name: str          # e.g., "Ephesus", "Mount Sinai", "Sea of Galilee"
-    significance: str          # 1-2 concise sentences of biblical/historical significance
-    modern_name: str           # e.g., "Near modern-day Selçuk, Turkey"
+    ancient_name: str
+    significance: str
+    modern_name: str
     lat: Optional[float] = None
     lng: Optional[float] = None
-    map_query: str             # search string safe for any map API
-    image_url: Optional[str] = None   # high-quality photo from Wikimedia
-    wiki_url: Optional[str] = None    # source Wikipedia page (for attribution)
-    wiki_extract: Optional[str] = None  # short encyclopedic blurb for hover / accessibility
+    map_query: str
+    image_url: Optional[str] = None
+    wiki_url: Optional[str] = None
+    wiki_extract: Optional[str] = None
+
+
+class DoreIllustration(BaseModel):
+    """A public-domain 1866 Gustave Doré Bible engraving from Wikimedia Commons."""
+    title: str                # cleaned display title, e.g., "The Sermon on the Mount"
+    image_url: str            # thumbnail-safe URL for card rendering
+    hires_url: str            # original file for Save/Print (usually same as image_url on Commons)
+    wiki_url: Optional[str] = None       # attribution page (Commons file page)
+    description: Optional[str] = None    # short caption from extmetadata
 
 
 class AskRequest(BaseModel):
@@ -84,6 +93,7 @@ class AskResponse(BaseModel):
     answer: str
     references: List[ScriptureRef] = []
     locations: List[ScriptureLocation] = []
+    illustration: Optional[DoreIllustration] = None
     created_at: str
 
 
@@ -123,6 +133,7 @@ class Conversation(BaseModel):
     answer: str
     references: List[ScriptureRef] = []
     locations: List[ScriptureLocation] = []
+    illustration: Optional[DoreIllustration] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
@@ -157,8 +168,15 @@ RESPONSE FORMAT — you MUST return valid JSON ONLY, no markdown fences, no pros
   ],
   "locations": [
     {"ancient_name": "Philippi", "significance": "The Roman colony in Macedonia where Paul planted a beloved church and later wrote his letter to them from prison.", "modern_name": "Near modern-day Filippoi, Greece", "lat": 41.0136, "lng": 24.2870, "map_query": "Philippi archaeological site, Greece"}
-  ]
+  ],
+  "illustration_theme": "sermon on the mount"
 }
+
+ILLUSTRATION_THEME field (new, required):
+- Choose 2-5 short keywords naming the single best scene from Gustave Doré's 1866 illustrated Bible that would visually accompany this counsel.
+- Prefer scenes tied to your cited scripture references. Examples of themes Doré depicted: "the creation of light", "noah's ark deluge", "abraham and isaac", "moses receiving tables of the law", "david and goliath", "psalm shepherd", "daniel in the lions den", "jonah cast into the sea", "the nativity", "the sermon on the mount", "the good samaritan", "the prodigal son", "peter walking on the water", "the storm on the sea of galilee", "the crucifixion", "the resurrection", "the ascension", "vision of the new jerusalem".
+- If the counsel is abstract with no obvious biblical scene, still choose the closest fit (e.g., anxiety → "peter walking on the water" or "the storm on the sea of galilee").
+- Keep it lowercase, 2-5 words, plain English. This is used for keyword search against Doré's engravings.
 
 The verse "text" MUST be the exact King James Version wording. Do not paraphrase, modernize, or invent verse text. If uncertain of exact wording, choose a verse you are certain of.
 Return ONLY the JSON object. No commentary before or after."""
@@ -289,6 +307,155 @@ async def _enrich_locations(locations: List[ScriptureLocation]) -> List[Scriptur
 
 
 # ============================================================
+# GUSTAVE DORÉ 1866 BIBLE ENGRAVING LOOKUP — public-domain woodcut style
+# from Wikimedia Commons category. Fetched and cached once forever.
+# ============================================================
+DORE_ARTICLE = "Gustave_Doré's_illustrations_for_La_Grande_Bible_de_Tours"
+DORE_CATALOG_KEY = "dore_bible_catalog_v3"
+
+
+_STOPWORDS = {"the", "a", "an", "of", "and", "in", "on", "at", "to", "with", "by", "from", "into"}
+
+
+def _tokens(s: str) -> set:
+    s = re.sub(r"[^a-z0-9\s]", " ", (s or "").lower())
+    return {t for t in s.split() if t and t not in _STOPWORDS and len(t) > 1}
+
+
+def _clean_dore_title(raw: str) -> str:
+    """Turn a Commons file title like 'File:074.The Sermon on the Mount.jpg' or
+    'File:DoreJesusSeaGalilee.jpg' into a readable display title."""
+    t = raw
+    if t.lower().startswith("file:"):
+        t = t[5:]
+    t = re.sub(r"\.[a-z0-9]{2,4}$", "", t, flags=re.I)
+    t = re.sub(r"^\d+[\.\-_ ]+", "", t)
+    t = t.replace("_", " ").strip()
+    # CamelCase → spaced words (e.g., "DoreJesusSeaGalilee" → "Dore Jesus Sea Galilee")
+    if " " not in t and re.search(r"[a-z][A-Z]", t):
+        t = re.sub(r"([a-z])([A-Z])", r"\1 \2", t)
+        t = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", t)
+    # Strip a redundant leading "Dore" / "Doré"
+    t = re.sub(r"^Dor[eé]\s+", "", t, flags=re.I)
+    return t.strip()
+
+
+async def _load_dore_catalog() -> List[dict]:
+    cached = await db.kv_cache.find_one({"_id": DORE_CATALOG_KEY}, {"_id": 0})
+    if cached and cached.get("items"):
+        return cached["items"]
+
+    headers = {"User-Agent": WIKI_USER_AGENT, "Accept": "application/json"}
+    items: List[dict] = []
+
+    try:
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            # 1) Fetch media list from the Wikipedia article — richest source
+            r = await client.get(
+                f"https://en.wikipedia.org/api/rest_v1/page/media-list/{DORE_ARTICLE}",
+                headers=headers,
+            )
+            file_titles: List[str] = []
+            captions: dict = {}
+            if r.status_code == 200:
+                data = r.json()
+                for m in data.get("items", []) or []:
+                    t = m.get("title", "")
+                    if t.lower().endswith((".jpg", ".jpeg", ".png", ".tif", ".tiff")) or t.startswith("File:"):
+                        file_titles.append(t if t.startswith("File:") else f"File:{t.lstrip('/')}")
+                        cap = ((m.get("caption") or {}).get("text") or "").strip()
+                        if cap:
+                            captions[file_titles[-1]] = re.sub(r"<[^>]+>", " ", cap).strip()
+
+            # 2) For each file title, resolve URL + hires via Commons imageinfo
+            #    (batch in groups of 50 to respect the API limit)
+            for i in range(0, len(file_titles), 50):
+                batch = file_titles[i:i + 50]
+                params = {
+                    "action": "query",
+                    "titles": "|".join(batch),
+                    "prop": "imageinfo",
+                    "iiprop": "url|extmetadata",
+                    "iiurlwidth": "1200",
+                    "format": "json",
+                }
+                rr = await client.get("https://commons.wikimedia.org/w/api.php",
+                                      params=params, headers=headers)
+                if rr.status_code != 200:
+                    continue
+                pages = ((rr.json().get("query") or {}).get("pages") or {})
+                for page in pages.values():
+                    ii = (page.get("imageinfo") or [{}])[0]
+                    if not ii:
+                        continue
+                    ptitle = page.get("title", "")
+                    title = _clean_dore_title(ptitle)
+                    if not title:
+                        continue
+                    ext = ii.get("extmetadata", {}) or {}
+                    desc_raw = (ext.get("ImageDescription", {}) or {}).get("value", "")
+                    desc = re.sub(r"<[^>]+>", " ", desc_raw).strip()[:280] or captions.get(ptitle)
+                    items.append({
+                        "title": title,
+                        "image_url": ii.get("thumburl") or ii.get("url"),
+                        "hires_url": ii.get("url"),
+                        "wiki_url": (
+                            f"https://commons.wikimedia.org/wiki/{ptitle.replace(' ', '_')}"
+                        ),
+                        "description": desc,
+                        "tokens": list(_tokens(title) | _tokens(desc or "")),
+                    })
+    except Exception as e:
+        logger.warning(f"Doré catalog load failed: {e}")
+        return []
+
+    await db.kv_cache.update_one(
+        {"_id": DORE_CATALOG_KEY},
+        {"$set": {"_id": DORE_CATALOG_KEY, "items": items,
+                  "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+    logger.info(f"Doré catalog cached: {len(items)} engravings")
+    return items
+
+
+def _match_dore(theme: str, catalog: List[dict]) -> Optional[dict]:
+    if not theme or not catalog:
+        return None
+    q = _tokens(theme)
+    if not q:
+        return None
+    best, best_score = None, 0
+    for item in catalog:
+        item_tokens = set(item.get("tokens") or _tokens(item.get("title", "")))
+        overlap = len(q & item_tokens)
+        if overlap > best_score:
+            best_score, best = overlap, item
+    return best if best_score > 0 else None
+
+
+async def _pick_dore_illustration(theme: str, references: List[ScriptureRef]) -> Optional[DoreIllustration]:
+    catalog = await _load_dore_catalog()
+    if not catalog:
+        return None
+    # Try the LLM's theme first
+    hit = _match_dore(theme, catalog)
+    # Fall back to using scripture book names + chapter as extra keywords
+    if not hit and references:
+        combined = " ".join(f"{r.book} {r.chapter}" for r in references[:3])
+        hit = _match_dore(combined, catalog)
+    if not hit:
+        return None
+    return DoreIllustration(
+        title=hit["title"],
+        image_url=hit["image_url"],
+        hires_url=hit["hires_url"] or hit["image_url"],
+        wiki_url=hit.get("wiki_url"),
+        description=hit.get("description"),
+    )
+
+
+# ============================================================
 # HELPERS
 # ============================================================
 def parse_llm_json(raw: str) -> dict:
@@ -353,7 +520,8 @@ async def ask_the_elder(question: str, session_id: str) -> dict:
         except Exception as e:
             logger.warning(f"Skipping malformed location {loc}: {e}")
 
-    return {"answer": data["answer"].strip(), "references": refs, "locations": locations}
+    return {"answer": data["answer"].strip(), "references": refs, "locations": locations,
+            "illustration_theme": str(data.get("illustration_theme") or "").strip()}
 
 
 # ============================================================
@@ -418,12 +586,23 @@ async def ask(req: AskRequest):
         except Exception as e:
             logger.warning(f"Location enrichment failed (non-fatal): {e}")
 
+    # Pick a matching Gustave Doré 1866 engraving for the counsel
+    illustration = None
+    try:
+        illustration = await _pick_dore_illustration(
+            result.get("illustration_theme", ""),
+            result.get("references", []),
+        )
+    except Exception as e:
+        logger.warning(f"Doré illustration lookup failed (non-fatal): {e}")
+
     conv = Conversation(
         session_id=session_id,
         question=req.question.strip(),
         answer=result["answer"],
         references=result["references"],
         locations=result.get("locations", []),
+        illustration=illustration,
     )
     doc = conv.model_dump()
     await db.conversations.insert_one(doc)
@@ -435,6 +614,7 @@ async def ask(req: AskRequest):
         answer=conv.answer,
         references=conv.references,
         locations=conv.locations,
+        illustration=conv.illustration,
         created_at=conv.created_at,
     )
 

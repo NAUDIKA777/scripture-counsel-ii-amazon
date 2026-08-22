@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Volume2, Pause, Loader2 } from "lucide-react";
 import ScriptureCard from "@/components/ScriptureCard";
 import LocationCard from "@/components/LocationCard";
+import IllustrationCard from "@/components/IllustrationCard";
 
 const audioBars = [0, 1, 2, 3, 4];
 
@@ -68,6 +69,13 @@ export default function ConversationCard({ convo, api }) {
 
       {/* Answer */}
       <div className="pl-6 md:pl-8 border-l-2" style={{ borderColor: "rgba(212,175,55,0.5)" }} data-testid="counsel-answer">
+        {/* 1866 Gustave Doré engraving matched to the counsel */}
+        {convo.illustration && (
+          <IllustrationCard
+            illustration={convo.illustration}
+            quoteVerse={convo.references?.[0]?.text}
+          />
+        )}
         <div className="flex items-center gap-4 mb-4">
           <div className="text-[10px] uppercase tracking-[0.35em]" style={{ color: "var(--gold)" }}>
             The Elder speaks
