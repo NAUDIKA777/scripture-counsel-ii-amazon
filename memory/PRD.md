@@ -40,3 +40,16 @@ An app that uses the Bible as a static knowledge base so when someone has an iss
 - **P2** — Search all past counsel by keyword.
 - **P2** — Multi-voice selector (offer 2-3 statesman voices).
 - **P2** — Share-as-image (verse card export to PNG).
+
+
+## Implemented (2026-02-22) — Branding Refresh
+- Renamed public brand to **"Wisdom & Word: Spoken Scripture & Archival Biblical Art"** across:
+  - `/app/frontend/public/manifest.json` (name + description)
+  - `/app/frontend/public/index.html` (title, meta description, OG, Twitter tags)
+  - `/app/landing/index.html` and mirrored `/app/frontend/public/landing.html` (title, meta, OG, Twitter, hero eyebrow, hero lede, features section title, replaced "Verse of Today" feature card with "Archival biblical art" 1866 Gustave Doré feature)
+- Verified: title, meta description, OG title, hero eyebrow, and hero lede all render the new copy on preview URL.
+
+## Backlog / Next Actions (updated)
+- **P1** — Add PWABuilder `assetlinks.json` under `/app/frontend/public/.well-known/` (blocked on user's SHA-256 fingerprint from Amazon Appstore packaging).
+- **P1** — Deploy preview → production so the new "Archival Biblical Art" branding reaches live visitors.
+- **P2** — Add a small "Featured today" archival Doré engraving strip on the landing page to visually anchor the new pillar.
