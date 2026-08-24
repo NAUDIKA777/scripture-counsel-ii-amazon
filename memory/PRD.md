@@ -53,3 +53,55 @@ An app that uses the Bible as a static knowledge base so when someone has an iss
 - **P1** — Add PWABuilder `assetlinks.json` under `/app/frontend/public/.well-known/` (blocked on user's SHA-256 fingerprint from Amazon Appstore packaging).
 - **P1** — Deploy preview → production so the new "Archival Biblical Art" branding reaches live visitors.
 - **P2** — Add a small "Featured today" archival Doré engraving strip on the landing page to visually anchor the new pillar.
+
+
+## Implemented (2026-02-22) — Amazon Appstore Clone
+This is a **separate fork** of the codebase intended only for Amazon Appstore
+submission. The web production site (`wisdominword.com`) still uses Stripe.
+
+**Removed from this clone**:
+- All Stripe endpoints from `backend/server.py`: `/payments/checkout`,
+  `/payments/status`, `/subscription/status`, `/subscription/portal`,
+  `/subscription/restore`, `/stripe/webhook`, plus `_mark_paid` and
+  `_ensure_portal_configuration`.
+- `backend/setup_stripe.py` and Stripe test files under `backend/tests/`.
+- Stripe env vars from `backend/.env`; `stripe` uninstalled and removed from
+  `requirements.txt`.
+- `frontend/src/lib/subscription.js`, `frontend/src/pages/PaymentSuccess.js`,
+  `frontend/src/pages/PaymentCancel.js`, and their routes in `App.js`.
+- All Stripe references in `privacy.html` and `service-worker.js`.
+
+**Added to this clone**:
+- `frontend/src/lib/revenuecat.js` — `@revenuecat/purchases-capacitor` wrapper
+  that no-ops on plain web and drives native Amazon IAP on the Capacitor build.
+- Rewrote `useAccess.js` to source Pro from RevenueCat `CustomerInfo`.
+- Rewrote `components/Paywall.js` for Amazon compliance:
+  "Subscribe via Amazon · $4.99/month" + "Restore Purchases" + full auto-
+  renewal disclosure + cancel path via *Your Amazon → Memberships & Subscriptions*.
+- `frontend/capacitor.config.ts` (`appId: com.wisdomandword.app`, `webDir: build`).
+- `frontend/android-manifest.patch.xml` — Amazon `<queries>`, IAP receiver,
+  and `launchMode="singleTop"` snippets to merge after `npx cap add android`.
+- `backend/server.py → POST /api/webhooks/revenuecat` — Bearer-auth webhook
+  ledger; entitlement remains client-authoritative via `CustomerInfo`.
+- `/app/AMAZON_APPSTORE_SETUP.md` — end-to-end setup guide.
+
+**Verified on 2026-02-22**:
+- Paywall renders "Subscribe via Amazon · $4.99 / month" + "Restore Purchases".
+- Web preview shows a graceful "install the Amazon Appstore edition" notice.
+- Zero occurrences of "Stripe" in the rendered paywall HTML.
+- `GET /api/health` returns `billing_provider: "revenuecat_amazon"`.
+
+## Backlog / Next Actions (Amazon build)
+- **P0** — User creates Amazon Developer account, registers app with package
+  `com.wisdomandword.app`, submits monthly IAP SKU
+  `com.wisdomandword.premium.monthly` at $4.99.
+- **P0** — User creates RevenueCat project, connects Amazon store with the
+  shared secret, and pastes the `amzn_...` public SDK key into
+  `frontend/.env → REACT_APP_REVENUECAT_AMAZON_PUBLIC_KEY`.
+- **P1** — Locally run `npx cap add android`, drop the PEM into
+  `android/app/src/main/assets/AppstoreAuthenticationKey.pem`, merge the
+  manifest patch, build signed release APK.
+- **P1** — Live App Testing on Amazon to verify RevenueCat receipts before
+  full submission.
+- **P2** — Enable the RevenueCat webhook for cross-device analytics
+  (`REVENUECAT_WEBHOOK_AUTH` on backend + webhook URL in RevenueCat).

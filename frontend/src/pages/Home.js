@@ -2,13 +2,12 @@ import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, ScrollText, Send, BookOpen, Sparkles, History, Lock, Settings } from "lucide-react";
+import { Loader2, ScrollText, Send, BookOpen, Sparkles, History, Lock } from "lucide-react";
 import Hero from "@/components/Hero";
 import ConversationCard from "@/components/ConversationCard";
 import VerseOfDay from "@/components/VerseOfDay";
 import Paywall from "@/components/Paywall";
 import { useAccess } from "@/hooks/useAccess";
-import { openBillingPortal } from "@/lib/subscription";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -31,22 +30,9 @@ export default function Home() {
   const [sessionId] = useState(getOrCreateSession);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [paywallReason, setPaywallReason] = useState("limit");
-  const [openingPortal, setOpeningPortal] = useState(false);
   const answersRef = useRef(null);
 
   const access = useAccess();
-
-  const onManageSubscription = async () => {
-    setOpeningPortal(true);
-    try {
-      const url = await openBillingPortal();
-      window.open(url, "_blank", "noopener,noreferrer");
-    } catch (e) {
-      toast.error(e?.response?.data?.detail || "Could not open the subscription portal.");
-    } finally {
-      setOpeningPortal(false);
-    }
-  };
 
   useEffect(() => {
     axios.get(`${API}/suggestions`)
@@ -113,23 +99,16 @@ export default function Home() {
             {/* Access pill */}
             {!access.loading && (
               access.isPro ? (
-                <button
-                  onClick={onManageSubscription}
-                  disabled={openingPortal}
+                <span
                   data-testid="access-pill-pro"
-                  aria-label="Manage subscription"
-                  title="Manage subscription"
-                  className="hidden sm:inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] uppercase tracking-widest border hover:bg-amber-500/10 disabled:opacity-60 disabled:cursor-wait"
+                  aria-label="Premium active"
+                  title="Manage from Your Amazon → Memberships & Subscriptions"
+                  className="hidden sm:inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] uppercase tracking-widest border"
                   style={{ borderColor: "rgba(212,175,55,0.5)", color: "var(--gold)" }}
                 >
-                  {openingPortal ? (
-                    <Loader2 className="w-3 h-3 animate-spin" strokeWidth={2} />
-                  ) : (
-                    <Sparkles className="w-3 h-3" strokeWidth={2} />
-                  )}
-                  Pro
-                  <Settings className="w-3 h-3 ml-1 opacity-70" strokeWidth={1.75} />
-                </button>
+                  <Sparkles className="w-3 h-3" strokeWidth={2} />
+                  Premium
+                </span>
               ) : (
                 <button
                   onClick={() => { setPaywallReason("upgrade"); setPaywallOpen(true); }}

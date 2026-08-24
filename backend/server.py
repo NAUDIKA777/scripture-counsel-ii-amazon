@@ -12,9 +12,8 @@ import random
 import secrets
 import html as html_lib
 import httpx
-import stripe
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict, EmailStr
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 import uuid
 from datetime import datetime, timezone
@@ -32,12 +31,7 @@ db = mongo_client[os.environ['DB_NAME']]
 
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 ELEVENLABS_API_KEY = os.environ.get('ELEVENLABS_API_KEY', '').strip()
-STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '').strip()
-STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '').strip()
-PRO_LOOKUP_KEY = "pro_monthly"
-
-if STRIPE_SECRET_KEY:
-    stripe.api_key = STRIPE_SECRET_KEY
+REVENUECAT_WEBHOOK_AUTH = os.environ.get('REVENUECAT_WEBHOOK_AUTH', '').strip()
 
 # Kind Statesman voice - "Daniel" (deep, warm, authoritative British)
 STATESMAN_VOICE_ID = "onwK4e9ZLuTAKqWW03F9"
@@ -99,21 +93,6 @@ class AskResponse(BaseModel):
 
 class TTSRequest(BaseModel):
     text: str
-
-
-class CheckoutRequest(BaseModel):
-    app_user_id: str
-    origin_url: str
-    email: Optional[EmailStr] = None
-
-
-class PortalRequest(BaseModel):
-    app_user_id: str
-    return_url: str
-
-
-class RestoreRequest(BaseModel):
-    email: EmailStr
 
 
 class CreateShareRequest(BaseModel):
@@ -538,7 +517,8 @@ async def health():
         "status": "ok",
         "llm_configured": bool(EMERGENT_LLM_KEY),
         "voice_configured": bool(ELEVENLABS_API_KEY),
-        "payments_configured": bool(STRIPE_SECRET_KEY),
+        "payments_configured": bool(REVENUECAT_WEBHOOK_AUTH),
+        "billing_provider": "revenuecat_amazon",
     }
 
 
@@ -653,329 +633,63 @@ async def tts(req: TTSRequest):
     return Response(content=audio_bytes, media_type="audio/mpeg")
 
 
-@api_router.post("/payments/checkout")
-async def create_checkout(req: CheckoutRequest):
-    """Create a Stripe Checkout Session for the Pro monthly subscription.
-    Returns the checkout_url to redirect the browser to."""
-    if not STRIPE_SECRET_KEY:
-        raise HTTPException(status_code=503, detail="Payments not configured")
-
-    prices = stripe.Price.list(lookup_keys=[PRO_LOOKUP_KEY], active=True, limit=1).data
-    if not prices:
-        raise HTTPException(status_code=500, detail=f"Price not found: {PRO_LOOKUP_KEY}. Run setup_stripe.py.")
-    price = prices[0]
-
-    metadata = {"app_user_id": req.app_user_id.strip(), "lookup_key": PRO_LOOKUP_KEY}
-    if req.email:
-        metadata["email"] = req.email.lower().strip()
-
-    kwargs = dict(
-        line_items=[{"price": price.id, "quantity": 1}],
-        mode="subscription" if price.recurring else "payment",
-        success_url=f"{req.origin_url}/payment/success?session_id={{CHECKOUT_SESSION_ID}}",
-        cancel_url=f"{req.origin_url}/payment/cancel",
-        metadata=metadata,
-        # Force USD display for every buyer — no automatic currency conversion.
-        adaptive_pricing={"enabled": False},
-    )
-    if req.email:
-        kwargs["customer_email"] = req.email.lower().strip()
-
-    # Try with Stripe Managed Payments (auto tax). Fall back progressively if the account
-    # doesn't have the required tax registration / head office address configured.
-    session = None
-    for attempt in (
-        {"managed_payments": {"enabled": True}},
-        {"automatic_tax": {"enabled": True}, "billing_address_collection": "required"},
-        {},  # Plain USD-only session — flat $4.99, no auto tax
-    ):
-        try:
-            session = stripe.checkout.Session.create(**kwargs, **attempt)
-            break
-        except stripe.error.InvalidRequestError as e:
-            msg = (getattr(e, "user_message", "") or str(e)).lower()
-            if any(k in msg for k in (
-                "managed payments", "ineligible", "head office",
-                "automatic tax", "tax registration", "not registered",
-            )):
-                logger.info(f"Stripe fallback (attempt {attempt}): {msg[:120]}")
-                continue
-            raise
-    if session is None:
-        raise HTTPException(status_code=500, detail="Could not create Stripe Checkout Session")
-
-    await db.payment_transactions.insert_one({
-        "session_id": session.id,
-        "app_user_id": req.app_user_id.strip(),
-        "email": metadata.get("email"),
-        "lookup_key": PRO_LOOKUP_KEY,
-        "amount": price.unit_amount or 0,
-        "currency": price.currency,
-        "status": "initiated",
-        "payment_status": "pending",
-        "created_at": datetime.now(timezone.utc),
-        "updated_at": datetime.now(timezone.utc),
-    })
-
-    return {"checkout_url": session.url, "session_id": session.id}
-
-
-async def _mark_paid(session_id: str, s) -> None:
-    """Idempotently mark a payment_transactions row paid and mirror into subscriptions."""
-    email = None
-    app_user_id = None
-    if s.metadata:
-        email = (s.metadata.get("email") or "").lower() or None
-        app_user_id = s.metadata.get("app_user_id")
-    if not email and getattr(s, "customer_email", None):
-        email = s.customer_email.lower()
-    if not email and getattr(s, "customer_details", None):
-        email = (s.customer_details.get("email") if isinstance(s.customer_details, dict) else getattr(s.customer_details, "email", None))
-        if email:
-            email = email.lower()
-
-    await db.payment_transactions.update_one(
-        {"session_id": session_id, "payment_status": {"$ne": "paid"}},
-        {"$set": {
-            "status": "completed",
-            "payment_status": "paid",
-            "email": email,
-            "stripe_subscription_id": getattr(s, "subscription", None),
-            "stripe_payment_intent_id": getattr(s, "payment_intent", None),
-            "stripe_customer_id": getattr(s, "customer", None),
-            "updated_at": datetime.now(timezone.utc),
-        }},
-    )
-    if app_user_id:
-        await db.subscriptions.update_one(
-            {"app_user_id": app_user_id},
-            {"$set": {
-                "app_user_id": app_user_id,
-                "email": email,
-                "pro_active": True,
-                "stripe_subscription_id": getattr(s, "subscription", None),
-                "stripe_customer_id": getattr(s, "customer", None),
-                "last_session_id": session_id,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }},
-            upsert=True,
-        )
-
-
-@api_router.get("/payments/status/{session_id}")
-async def payment_status(session_id: str):
-    if not STRIPE_SECRET_KEY:
-        raise HTTPException(status_code=503, detail="Payments not configured")
-    record = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0})
-    if not record:
-        raise HTTPException(status_code=404, detail="Transaction not found")
-
-    # Webhook-independent fallback: if still pending, ask Stripe directly.
-    if record.get("payment_status") != "paid":
-        try:
-            s = stripe.checkout.Session.retrieve(session_id)
-            if s.payment_status == "paid" or s.status == "complete":
-                await _mark_paid(session_id, s)
-                record = await db.payment_transactions.find_one({"session_id": session_id}, {"_id": 0}) or record
-        except stripe.error.StripeError as e:
-            logger.warning(f"Stripe status retrieve failed: {e}")
-
-    return {
-        "session_id": record["session_id"],
-        "status": record.get("status"),
-        "payment_status": record.get("payment_status"),
-    }
-
-
-@api_router.get("/subscription/status/{app_user_id}")
-async def subscription_status(app_user_id: str):
-    """Return whether the given anonymous browser user has an active Pro subscription."""
-    sub = await db.subscriptions.find_one({"app_user_id": app_user_id.strip()}, {"_id": 0})
-    if not sub:
-        return {"app_user_id": app_user_id, "pro_active": False}
-
-    active = bool(sub.get("pro_active"))
-
-    # If we have a Stripe subscription id, verify with Stripe (handles cancellation/expiry)
-    sub_id = sub.get("stripe_subscription_id")
-    if active and sub_id and STRIPE_SECRET_KEY:
-        try:
-            s = stripe.Subscription.retrieve(sub_id)
-            active = s.status in {"active", "trialing", "past_due"}
-            if bool(sub.get("pro_active")) != active:
-                await db.subscriptions.update_one(
-                    {"app_user_id": app_user_id.strip()},
-                    {"$set": {"pro_active": active, "updated_at": datetime.now(timezone.utc).isoformat()}},
-                )
-        except stripe.error.StripeError as e:
-            logger.warning(f"Stripe subscription retrieve failed: {e}")
-
-    return {"app_user_id": app_user_id, "pro_active": active, "email": sub.get("email")}
-
-
-def _ensure_portal_configuration() -> Optional[str]:
-    """Return an active Stripe Billing Portal configuration id, creating a default
-    one if the account doesn't have any yet. Returns None on failure."""
-    try:
-        existing = stripe.billing_portal.Configuration.list(active=True, limit=1).data
-        if existing:
-            return existing[0].id
-        cfg = stripe.billing_portal.Configuration.create(
-            business_profile={"headline": "Wisdom & Word — manage your subscription"},
-            features={
-                "customer_update": {"enabled": True, "allowed_updates": ["email"]},
-                "invoice_history": {"enabled": True},
-                "payment_method_update": {"enabled": True},
-                "subscription_cancel": {
-                    "enabled": True,
-                    "mode": "at_period_end",
-                    "cancellation_reason": {
-                        "enabled": True,
-                        "options": ["too_expensive", "missing_features", "unused", "customer_service", "other"],
-                    },
-                },
-            },
-        )
-        return cfg.id
-    except stripe.error.StripeError as e:
-        logger.warning(f"Portal configuration setup failed: {e}")
-        return None
-
-
-@api_router.post("/subscription/portal")
-async def customer_portal(req: PortalRequest):
-    """Create a Stripe Billing Portal session so a Pro user can manage / cancel
-    their subscription, update card, view invoices."""
-    if not STRIPE_SECRET_KEY:
-        raise HTTPException(status_code=503, detail="Payments not configured")
-
-    sub = await db.subscriptions.find_one({"app_user_id": req.app_user_id.strip()}, {"_id": 0})
-    customer_id = sub.get("stripe_customer_id") if sub else None
-    if not customer_id:
-        raise HTTPException(status_code=404, detail="No active subscription found for this user")
+# ============================================================
+# REVENUECAT WEBHOOK — Amazon Appstore subscription events
+# Client (@revenuecat/purchases-capacitor) is authoritative for entitlement
+# state; this endpoint is a lightweight ledger for cross-device analytics
+# and future server-side content gating. It never grants access on its own.
+# ============================================================
+@api_router.post("/webhooks/revenuecat")
+async def revenuecat_webhook(request: Request):
+    if not REVENUECAT_WEBHOOK_AUTH:
+        raise HTTPException(status_code=503, detail="Webhook not configured")
+    auth = request.headers.get("authorization", "")
+    if auth != f"Bearer {REVENUECAT_WEBHOOK_AUTH}":
+        raise HTTPException(status_code=401, detail="unauthorized")
 
     try:
-        portal = stripe.billing_portal.Session.create(
-            customer=customer_id,
-            return_url=req.return_url,
-        )
-    except stripe.error.InvalidRequestError as e:
-        msg = (getattr(e, "user_message", "") or str(e)).lower()
-        if "configuration" in msg or "no configuration" in msg or "default configuration" in msg:
-            cfg_id = _ensure_portal_configuration()
-            if not cfg_id:
-                raise HTTPException(status_code=500, detail="Could not create billing portal configuration")
-            portal = stripe.billing_portal.Session.create(
-                customer=customer_id,
-                return_url=req.return_url,
-                configuration=cfg_id,
-            )
-        else:
-            logger.exception("Portal session creation failed")
-            raise HTTPException(status_code=500, detail=str(e))
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="invalid json")
 
-    return {"portal_url": portal.url}
+    event = payload.get("event") or {}
+    event_id = event.get("id")
+    app_user_id = event.get("app_user_id")
+    if not event_id or not app_user_id:
+        return {"status": "ignored"}
 
-
-@api_router.post("/subscription/restore")
-async def restore(req: RestoreRequest):
-    """Restore an existing subscription by email. Looks up the most recent paid
-    payment_transactions record for this email and re-associates that
-    subscription with the current browser's app_user_id."""
-    email = req.email.lower().strip()
-
-    sub = await db.subscriptions.find_one({"email": email, "pro_active": True}, {"_id": 0})
-    if not sub:
-        # Look up via the paid payment_transactions in case subscriptions record is missing
-        pt = await db.payment_transactions.find_one(
-            {"email": email, "payment_status": "paid"},
-            sort=[("updated_at", -1)],
-        )
-        if not pt:
-            return {"app_user_id": None, "pro_active": False, "found": False}
-        sub = {
-            "app_user_id": pt.get("app_user_id"),
-            "email": email,
-            "stripe_subscription_id": pt.get("stripe_subscription_id"),
-        }
-
-    # Confirm current status with Stripe if available
-    active = True
-    sub_id = sub.get("stripe_subscription_id")
-    if sub_id and STRIPE_SECRET_KEY:
-        try:
-            s = stripe.Subscription.retrieve(sub_id)
-            active = s.status in {"active", "trialing", "past_due"}
-        except stripe.error.StripeError as e:
-            logger.warning(f"Stripe restore verify failed: {e}")
-
-    await db.subscriptions.update_one(
-        {"app_user_id": sub.get("app_user_id")},
-        {"$set": {
-            "app_user_id": sub.get("app_user_id"),
-            "email": email,
-            "pro_active": active,
-            "stripe_subscription_id": sub_id,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+    now = datetime.now(timezone.utc)
+    await db.subscription_events.update_one(
+        {"event_id": event_id},
+        {"$setOnInsert": {
+            "event_id": event_id,
+            "type": event.get("type"),
+            "store": event.get("store"),
+            "app_user_id": app_user_id,
+            "product_id": event.get("product_id"),
+            "entitlement_ids": event.get("entitlement_ids") or [],
+            "expiration_at_ms": event.get("expiration_at_ms"),
+            "received_at": now.isoformat(),
         }},
         upsert=True,
     )
 
-    return {
-        "app_user_id": sub.get("app_user_id"),
-        "pro_active": active,
-        "found": True,
+    tracked_types = {
+        "INITIAL_PURCHASE", "RENEWAL", "PRODUCT_CHANGE", "CANCELLATION",
+        "UNCANCELLATION", "NON_RENEWING_PURCHASE", "SUBSCRIPTION_PAUSED",
+        "EXPIRATION", "BILLING_ISSUE", "TRANSFER",
     }
-
-
-@api_router.post("/stripe/webhook")
-async def stripe_webhook(request: Request):
-    if not STRIPE_WEBHOOK_SECRET:
-        raise HTTPException(status_code=503, detail="Webhook not configured")
-    payload = await request.body()
-    sig = request.headers.get("stripe-signature", "")
-    try:
-        event = stripe.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
-    except stripe.error.SignatureVerificationError:
-        raise HTTPException(status_code=400, detail="Invalid signature")
-    except Exception as e:
-        logger.warning(f"Webhook construct_event failed: {e}")
-        raise HTTPException(status_code=400, detail="Invalid payload")
-
-    obj = event["data"]["object"]
-    t = event["type"]
-
-    if t == "checkout.session.completed":
-        await _mark_paid(obj["id"], stripe.checkout.Session.retrieve(obj["id"]))
-    elif t == "checkout.session.async_payment_succeeded":
-        await db.payment_transactions.update_one(
-            {"session_id": obj["id"]},
-            {"$set": {"payment_status": "paid", "updated_at": datetime.now(timezone.utc)}},
+    if event.get("type") in tracked_types:
+        await db.users.update_one(
+            {"app_user_id": app_user_id},
+            {"$set": {
+                "last_event_type": event.get("type"),
+                "last_event_store": event.get("store"),
+                "last_product_id": event.get("product_id"),
+                "updated_at": now.isoformat(),
+            }},
+            upsert=True,
         )
-    elif t == "checkout.session.async_payment_failed":
-        await db.payment_transactions.update_one(
-            {"session_id": obj["id"]},
-            {"$set": {"status": "failed", "payment_status": "failed", "updated_at": datetime.now(timezone.utc)}},
-        )
-    elif t == "checkout.session.expired":
-        await db.payment_transactions.update_one(
-            {"session_id": obj["id"]},
-            {"$set": {"status": "expired", "payment_status": "expired", "updated_at": datetime.now(timezone.utc)}},
-        )
-    elif t in ("customer.subscription.deleted", "customer.subscription.updated"):
-        # Mirror subscription cancellation / status changes
-        status = obj.get("status")
-        active = status in {"active", "trialing", "past_due"}
-        await db.subscriptions.update_many(
-            {"stripe_subscription_id": obj.get("id")},
-            {"$set": {"pro_active": active, "updated_at": datetime.now(timezone.utc).isoformat()}},
-        )
-    elif t == "charge.refunded":
-        await db.payment_transactions.update_one(
-            {"stripe_payment_intent_id": obj.get("payment_intent")},
-            {"$set": {"status": "refunded", "payment_status": "refunded", "updated_at": datetime.now(timezone.utc)}},
-        )
-
     return {"status": "ok"}
 
 

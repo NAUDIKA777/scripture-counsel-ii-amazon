@@ -1,0 +1,32 @@
+<!--
+    Wisdom & Word — Amazon Appstore Android manifest additions.
+    After you run `npx cap add android` (or `npx cap sync android`), open
+    /app/frontend/android/app/src/main/AndroidManifest.xml and merge the
+    <queries> block, the launchMode attribute on <activity ...MainActivity>,
+    and the IAP <receiver> below into the auto-generated manifest.
+    Do NOT replace the file wholesale — Capacitor generates lots of required
+    boilerplate.
+-->
+
+<!-- 1) Package visibility for Amazon (Android 11+). Merge inside <manifest>. -->
+<queries>
+    <package android:name="com.amazon.venezia" />
+    <package android:name="com.amazon.sdktestclient" />
+</queries>
+
+<!-- 2) Amazon IAP response receiver.
+     RevenueCat's Amazon plugin normally injects this via manifest merge.
+     Add it ONLY if the merged manifest is missing it. Nest inside <application>. -->
+<receiver
+    android:name="com.amazon.device.iap.ResponseReceiver"
+    android:exported="true"
+    android:permission="com.amazon.inapp.purchasing.Permission.NOTIFY">
+    <intent-filter>
+        <action android:name="com.amazon.inapp.purchasing.NOTIFY" />
+    </intent-filter>
+</receiver>
+
+<!-- 3) Ensure the Capacitor MainActivity uses singleTop so the Amazon purchase
+        dialog does not tear down the activity when it resumes. Update the
+        existing <activity ... android:name=".MainActivity"> attribute. -->
+<!-- android:launchMode="singleTop" -->

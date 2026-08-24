@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  checkProEntitlement,
+  configureRevenueCat,
+  isPremiumActive,
   getFreeCount,
   incrementFreeCount,
   FREE_LIMIT,
-} from "@/lib/subscription";
+} from "@/lib/revenuecat";
 
 /**
- * Combines the Stripe-backed Pro entitlement + local free-counsel counter.
- * canAsk  -> user is allowed to submit a new counsel
- * mustPay -> free counsels exhausted and no active subscription
+ * Access gate for the Amazon Appstore build.
+ * - 3 free counsels tracked locally in localStorage.
+ * - "Pro" entitlement comes from RevenueCat CustomerInfo (Amazon store) —
+ *   authoritative on device, refreshed on mount and on demand.
+ * - In a plain web browser (no Capacitor), isPro will always be false;
+ *   the paywall messaging directs the user to the Amazon build.
  */
 export function useAccess() {
   const [isPro, setIsPro] = useState(false);
@@ -19,7 +23,8 @@ export function useAccess() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const active = await checkProEntitlement();
+      await configureRevenueCat();
+      const active = await isPremiumActive();
       setIsPro(active);
     } finally {
       setFreeCount(getFreeCount());

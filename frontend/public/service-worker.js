@@ -31,7 +31,7 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
-  // Only GET requests are cached; never touch API calls, POSTs, or Stripe.
+  // Only GET requests are cached; never touch API calls, POSTs, or billing.
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.pathname.startsWith("/api/")) return;
