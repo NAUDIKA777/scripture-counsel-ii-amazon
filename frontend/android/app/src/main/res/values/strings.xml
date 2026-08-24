@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Wisdom &amp; Word</string>
+    <string name="title_activity_main">Wisdom &amp; Word</string>
+    <string name="package_name">com.wisdomandword.app</string>
+    <string name="custom_url_scheme">com.wisdomandword.app</string>
+</resources>

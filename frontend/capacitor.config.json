@@ -1,0 +1,8 @@
+{
+  "appId": "com.wisdomandword.app",
+  "appName": "Wisdom & Word",
+  "webDir": "build",
+  "android": {
+    "allowMixedContent": false
+  }
+}

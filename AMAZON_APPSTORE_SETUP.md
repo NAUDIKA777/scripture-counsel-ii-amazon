@@ -1,203 +1,131 @@
-# Wisdom & Word — Amazon Appstore Edition · Setup Guide
+# Wisdom & Word — Amazon Appstore Edition · Final Local Build Steps
 
-This clone of Wisdom & Word ships to the **Amazon Appstore only**. All external
-billing has been removed. Purchases are handled by **Amazon In-App Purchasing**
-via the **RevenueCat Capacitor SDK**.
+Everything that can be automated inside the Emergent workspace has been done.
+The `android/` Capacitor project is already scaffolded with:
 
-You will do the setup **once** across three consoles (Amazon Developer,
-RevenueCat, and your local machine), paste two secrets, and run three commands.
+- `appId = com.wisdomandword.app`
+- RevenueCat Capacitor plugin registered
+- `AndroidManifest.xml` merged with the Amazon `<queries>`, IAP `<receiver>`,
+  and `MainActivity launchMode="singleTop"`
+- `android/app/build.gradle` includes
+  `com.revenuecat.purchases:purchases-store-amazon:10.15.1`
+- The production React bundle (with your `amzn_oBFPlvVmUDQAdMgWSmvQOtLECVV`
+  key baked in) is copied to `android/app/src/main/assets/public/`
 
----
-
-## Part A — Amazon Developer Console (create the app & subscription SKU)
-
-1. **Create the developer account** at <https://developer.amazon.com/>. Complete
-   the profile, legal entity, tax, and payout information.
-2. **Add the app**: *My Apps → Add a New App → Android*. Enter:
-   - **App name**: `Wisdom & Word`
-   - **Package name (must match exactly)**: `com.wisdomandword.app`
-3. Create an **Upcoming Version** for the app (you will upload the signed APK later).
-4. **Create the subscription IAP**:
-   - Open *In-App Items → Add Single IAP → Subscription*.
-   - Parent SKU: `com.wisdomandword.premium`
-   - Title: `Wisdom & Word Premium`
-   - Add a **monthly term** (child SKU): `com.wisdomandword.premium.monthly`
-   - Type: **Paid subscription** · US price: **$4.99** · no free trial
-   - Fill localized title/description/icon → **Submit IAP**
-5. **Grab the Amazon public key (PEM)**:
-   - App page → *Upload Your App File → Additional information → View public key*
-   - Download `AppstoreAuthenticationKey.pem`
-   - **Save it** — you will drop it into `android/app/src/main/assets/` after
-     running `npx cap add android` (see Part D).
-6. **Grab the Amazon Shared Secret**: *Settings → Identity → Shared Secret*.
-   Copy this — RevenueCat needs it.
-
-> SKUs are case-sensitive and globally unique per Amazon developer account.
-> Use the term SKU exactly (`com.wisdomandword.premium.monthly`), not the parent.
+Pull this repo to your local machine and run these commands. Java 17 and the
+Android SDK are required locally — Emergent's container cannot compile APKs.
 
 ---
 
-## Part B — RevenueCat (create project, connect Amazon, get SDK key)
+## 1. Drop the Amazon PEM key
 
-1. Sign up at <https://app.revenuecat.com/signup>.
-2. Create a project called **Wisdom & Word**.
-3. *Project Settings → Apps → New app → Amazon Appstore*:
-   - App name: `Wisdom & Word`
-   - Package name: `com.wisdomandword.app`
-   - **Amazon Shared Secret** (from Part A step 6): paste it
-4. *Project Settings → API keys → App-specific keys*: copy the Amazon **public
-   SDK key** that starts with `amzn_...`.
-5. *Product catalog → Products → Amazon Appstore → Add product*:
-   - Store product identifier: `com.wisdomandword.premium.monthly`
-6. Create an **entitlement** called `premium` and attach the product above.
-7. Create (or edit) the `default` **offering** and add a **monthly package**
-   containing the Amazon product.
-8. *(Optional but recommended)* *Integrations → Webhooks → Add webhook*:
-   - URL: `https://<your-backend-domain>/api/webhooks/revenuecat`
-   - Authorization header: `Bearer <RANDOM_LONG_STRING>` — you will paste the
-     same string into `backend/.env` as `REVENUECAT_WEBHOOK_AUTH`.
-
----
-
-## Part C — Paste secrets into the codebase
-
-### `/app/frontend/.env`
-
-```env
-REACT_APP_REVENUECAT_AMAZON_PUBLIC_KEY=amzn_your_public_sdk_key_here
-```
-
-### `/app/backend/.env` *(only if you enabled the webhook in step B.8)*
-
-```env
-REVENUECAT_WEBHOOK_AUTH=your_random_long_string_matching_the_bearer_token
-```
-
-After editing either file:
+From the Amazon Developer Console → your app's Upcoming Version →
+*Additional information → View public key* → **Download**, then:
 
 ```bash
-sudo supervisorctl restart backend frontend
+mv ~/Downloads/AppstoreAuthenticationKey.pem \
+   frontend/android/app/src/main/assets/AppstoreAuthenticationKey.pem
+rm frontend/android/app/src/main/assets/PLACE_AMAZON_PEM_HERE.txt
 ```
+
+The Amazon Appstore SDK looks for that **exact filename** in that folder.
 
 ---
 
-## Part D — Build the Android APK (local machine, not the Emergent preview)
-
-The Capacitor plugin, RevenueCat native SDK, Amazon Appstore SDK, and the
-Amazon IAP SDK need the **Android SDK + Java 17** installed. Do these on
-**your local machine**:
+## 2. Build the release APK
 
 ```bash
-# 1. Clone the codebase or pull the latest, then:
 cd frontend
+
+# (Only if you edit React code after cloning; the bundle is already synced.)
 yarn install
-yarn build              # produces build/ that Capacitor bundles
-
-# 2. Add the Android platform (only once)
-npx cap add android
-
-# 3. Drop the Amazon PEM key into the Android project
-mkdir -p android/app/src/main/assets
-cp /path/to/AppstoreAuthenticationKey.pem android/app/src/main/assets/
-
-# 4. Add the Amazon RevenueCat store dependency to android/app/build.gradle
-#    inside the dependencies { } block (match the version pulled by the plugin):
-#
-#      implementation "com.revenuecat.purchases:purchases-store-amazon:<version>"
-#
-#    Then run:
+yarn build
 npx cap sync android
 
-# 5. Merge the manifest patch in /app/frontend/android-manifest.patch.xml
-#    into android/app/src/main/AndroidManifest.xml (queries, receiver, launchMode).
-
-# 6. Build the release APK
 cd android
 ./gradlew clean assembleRelease
-# → android/app/build/outputs/apk/release/app-release.apk
 ```
 
----
+The signed unaligned APK lands at:
 
-## Part E — Sandbox testing with Amazon App Tester
+```
+frontend/android/app/build/outputs/apk/release/app-release-unsigned.apk
+```
 
-Before submitting to Amazon:
-
-1. Install the **Amazon App Tester** from the Amazon Appstore on a Fire tablet
-   or on an Android device that has the Amazon Appstore installed.
-2. Create the following `amazon.sdktester.json` on the device (in
-   `/sdcard/Android/data/com.amazon.sdktestclient/files/` or the location the
-   App Tester version you installed expects):
-
-    ```json
-    {
-      "com.wisdomandword.premium": {
-        "itemType": "SUBSCRIPTION",
-        "title": "Wisdom & Word Premium",
-        "description": "Monthly premium access",
-        "subscriptionParent": "com.wisdomandword.premium"
-      },
-      "com.wisdomandword.premium.monthly": {
-        "itemType": "SUBSCRIPTION",
-        "title": "Wisdom & Word Premium Monthly",
-        "description": "Auto-renewing monthly subscription",
-        "subscriptionParent": "com.wisdomandword.premium",
-        "term": "Monthly",
-        "price": 4.99
-      }
-    }
-    ```
-
-3. Install the debug APK, open Wisdom & Word, exhaust the 3 free counsels,
-   tap **Subscribe via Amazon**, complete the mocked purchase, verify the
-   paywall closes and the *Premium* pill appears in the nav.
-4. Kill and relaunch — Premium should still be active (RevenueCat restores on
-   `getCustomerInfo`).
-5. Tap **Restore Purchases** — should confirm the restore.
-
-> ⚠️ **RevenueCat caveat**: purchases made through App Tester are **not**
-> validated by RevenueCat. Use Amazon's **Live App Testing** track for
-> end-to-end RevenueCat receipt validation before releasing to production.
+Sign it with your Amazon keystore (`jarsigner` + `zipalign`) or configure a
+signing config in `android/app/build.gradle` before `assembleRelease`.
 
 ---
 
-## Part F — Submit to Amazon Appstore
+## 3. Sandbox test with Amazon App Tester
 
-1. Upload the signed release APK to the Upcoming Version created in Part A.
-2. Attach the submitted IAP subscription to this build.
-3. Fill screenshots, descriptions, privacy URL
-   (`https://wisdominword.com/privacy.html`), and content ratings.
-4. Submit for review.
+Same procedure as before:
+
+1. Install **Amazon App Tester** on a Fire tablet or an Android device that
+   has the Amazon Appstore installed.
+2. Push this JSON to App Tester's expected path (see App Tester's on-screen
+   instructions — usually the app's own external files dir):
+
+   ```json
+   {
+     "com.wisdomandword.premium": {
+       "itemType": "SUBSCRIPTION",
+       "title": "Wisdom & Word Premium",
+       "description": "Monthly premium access",
+       "subscriptionParent": "com.wisdomandword.premium"
+     },
+     "com.wisdomandword.premium.monthly": {
+       "itemType": "SUBSCRIPTION",
+       "title": "Wisdom & Word Premium Monthly",
+       "description": "Auto-renewing monthly subscription",
+       "subscriptionParent": "com.wisdomandword.premium",
+       "term": "Monthly",
+       "price": 4.99
+     }
+   }
+   ```
+
+3. Install the debug APK (`./gradlew assembleDebug`) on the device.
+4. Exhaust 3 free counsels → tap **Subscribe via Amazon** → confirm the mocked
+   purchase → verify the *Premium* pill appears in the nav.
+5. Kill and relaunch → premium should still be active.
+6. Tap **Restore Purchases** → should restore.
+
+> ⚠️ App Tester purchases are **not** validated by RevenueCat. Move to
+> **Live App Testing** on Amazon before submitting production.
 
 ---
 
-## Amazon Appstore paywall-compliance checklist (already implemented)
+## 4. Submit to Amazon Appstore
 
-- ✅ Primary CTA reads **"Subscribe via Amazon · $4.99 / month"** and calls
-  `Purchases.purchasePackage(...)` — no web redirect.
-- ✅ Secondary **"Restore Purchases"** button calls `Purchases.restorePurchases()`.
-- ✅ Full disclosure below buttons: auto-renewal, Amazon account charge, 24h
-  cancel window, and the exact cancel path
-  (*Your Amazon → Memberships & Subscriptions*).
-- ✅ No Stripe, PayPal, "Subscribe on the web", "manage on our site",
-  external URLs, or alternative payment references anywhere in the build.
-- ✅ Entitlement unlocks only after `CustomerInfo.entitlements.active.premium`
-  reports true — never on button click alone.
-- ✅ Privacy policy updated to declare **Amazon In-App Purchasing** and
-  **RevenueCat** as the payment/subscription processors.
+1. Upload the signed release APK to your Upcoming Version.
+2. Attach the submitted IAP (`com.wisdomandword.premium.monthly`) to this build.
+3. Fill screenshots, description, content ratings, privacy URL
+   (`https://wisdominww.com/privacy.html`).
+4. **Submit for review.**
 
 ---
 
-## Files reference
+## Current environment
 
-- `frontend/src/lib/revenuecat.js` — RevenueCat wrapper (configure, subscribe,
-  restore, entitlement check). All calls no-op safely in a plain web browser.
-- `frontend/src/hooks/useAccess.js` — combines local free-counter + RevenueCat
-  entitlement.
-- `frontend/src/components/Paywall.js` — Amazon-compliant paywall UI.
-- `frontend/capacitor.config.ts` — Capacitor Android config
-  (`appId: com.wisdomandword.app`).
-- `frontend/android-manifest.patch.xml` — AndroidManifest snippets to merge
-  after `npx cap add android`.
-- `backend/server.py → /api/webhooks/revenuecat` — optional server-side
-  ledger of Amazon subscription events (gated by `REVENUECAT_WEBHOOK_AUTH`).
+- `frontend/.env → REACT_APP_REVENUECAT_AMAZON_PUBLIC_KEY = amzn_oBFPlvVmUDQAdMgWSmvQOtLECVV`
+  ✅ pasted
+- `backend/.env → REVENUECAT_WEBHOOK_AUTH` is empty. Fill it later with any
+  long random string if you want the cross-device webhook ledger; then paste
+  the same value as `Bearer <string>` into
+  *RevenueCat → Integrations → Webhooks → Authorization*.
+
+## Files that already contain the Amazon changes
+
+- `frontend/capacitor.config.json`
+- `frontend/android/` (entire scaffolded project)
+- `frontend/android/app/build.gradle`
+- `frontend/android/app/src/main/AndroidManifest.xml`
+- `frontend/android/app/src/main/assets/public/` (built bundle)
+- `frontend/src/lib/revenuecat.js`
+- `frontend/src/hooks/useAccess.js`
+- `frontend/src/components/Paywall.js`
+- `backend/server.py` — `POST /api/webhooks/revenuecat`
+- `frontend/public/privacy.html` — Amazon-IAP wording
+
+Nothing outside these paths references Stripe anymore.

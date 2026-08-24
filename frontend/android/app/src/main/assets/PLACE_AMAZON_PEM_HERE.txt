@@ -1,0 +1,8 @@
+Drop AppstoreAuthenticationKey.pem into this directory.
+
+Where to get it: Amazon Developer Console → your app → Upload Your App File
+                 → Additional information → View public key → Download.
+
+DO NOT rename the file. The Amazon Appstore SDK expects the exact filename
+`AppstoreAuthenticationKey.pem`. Delete this placeholder file after adding the
+PEM.
