@@ -80,6 +80,9 @@ class AskRequest(BaseModel):
     session_id: Optional[str] = None
 
 
+MAX_QUESTION_LEN = 2000
+
+
 class AskResponse(BaseModel):
     id: str
     session_id: str
@@ -547,17 +550,26 @@ async def suggestions():
 @api_router.post("/ask", response_model=AskResponse)
 async def ask(req: AskRequest):
     if not req.question or not req.question.strip():
-        raise HTTPException(status_code=400, detail="Question is required")
+        raise HTTPException(status_code=400, detail="Please share what weighs on your heart.")
+    question = req.question.strip()
+    if len(question) > MAX_QUESTION_LEN:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Question is too long. Please shorten to {MAX_QUESTION_LEN} characters or fewer.",
+        )
     if not EMERGENT_LLM_KEY:
-        raise HTTPException(status_code=503, detail="LLM key not configured")
+        raise HTTPException(status_code=503, detail="Counsel service is not configured. Please try again later.")
 
     session_id = req.session_id or str(uuid.uuid4())
 
     try:
-        result = await ask_the_elder(req.question.strip(), session_id)
-    except Exception as e:
+        result = await ask_the_elder(question, session_id)
+    except Exception:
         logger.exception("LLM call failed")
-        raise HTTPException(status_code=500, detail=f"Counsel could not be generated: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail="Counsel could not be generated right now. Please try again in a moment.",
+        )
 
     # Enrich locations with Nominatim (cached in Mongo — fast after first lookup)
     if result.get("locations"):

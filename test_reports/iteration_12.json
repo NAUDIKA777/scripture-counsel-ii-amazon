@@ -1,0 +1,33 @@
+{
+  "summary": "Amazon Appstore edition (branch amazon-build) Fire OS input crash fix validation. Backend: 8/8 pytest cases pass, covering /api/ask empty/whitespace/oversize (400 with kind messages), special-char + <script> input (200, JSON-escaped, safely stored), valid question happy path with persistence via /api/history, /api/health returning billing_provider='revenuecat_amazon' + payments_configured (no Stripe references), /api/suggestions and /api/history/{uuid} well-formed. Frontend: 12/12 Playwright checks pass — desktop home load, rapid typing (48 chars) no drops, empty-submit toast without network call, whitespace-only client-blocked (0 POST /api/ask), maxLength=2000 truncation on 3000-char paste, valid submit clears input & renders answers-section, follow-up sticky bar visible after first counsel, rapid double-Enter within 200ms fires exactly ONE POST /api/ask (debounce works), paywall opens on wisdom_free_counsel_count=3 with Subscribe + Restore buttons and NO Stripe DOM text, Fire HD 8 mobile viewport (412x915) keyboard.type at 50ms/char preserves all 57 characters exactly — the core reviewer reproduction case is resolved. Zero console errors across all flows.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_ask_amazon.py",
+    "/app/test_reports/pytest/pytest_amazon.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Consider also enforcing MAX_QUESTION_LEN on the raw pre-strip length in server.py to prevent someone sending 100KB of whitespace before the strip (currently strips first then measures; acceptable but O(n)).",
+    "ErrorBoundary fallback UI is only reachable via real render exceptions — not directly testable without intentional crash injection. Good separation. No changes needed.",
+    "server.py /api/ask never returns raw exception text (verified 502 sanitized message). Good.",
+    "Suggestion: also add rel=noopener to any external links in Paywall (not verified in this iteration)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_ask_amazon.py (new)"
+  ],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% (12/12)"},
+  "test_credentials": "N/A - anonymous app, no login. Paywall forced via localStorage wisdom_free_counsel_count=3.",
+  "seed_data_creation": "None. Test data created via /api/ask are anonymous conversations keyed by ephemeral session_id UUIDs.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Amazon Appstore build (branch amazon-build). Backend has MAX_QUESTION_LEN=2000 and billing_provider='revenuecat_amazon'. Fire OS input crash fixes verified: IME composition guard, 500ms submit debounce, ErrorBoundary at page + per-card, 45s axios timeout, safe error toasts. All prior Stripe-era iterations (1-11) are obsolete for this branch. Test file: /app/backend/tests/test_ask_amazon.py.",
+  "rca of the issue": "N/A — validating prior fixes for reviewer-reported Fire OS input crashes. All applied fixes verified working: (1) IME nativeEvent.isComposing + keyCode 229 guard prevents premature submit during predictive-text composition. (2) lastSubmitRef 500ms lockout confirmed by network log showing exactly 1 POST when Enter pressed twice within ~50ms. (3) maxLength=2000 client-enforced (3000-char paste truncated). (4) safeErrorMessage never toasts objects. (5) ErrorBoundary wraps page + each ConversationCard. (6) Backend caps at 2000, returns 400 with human message for empty/whitespace, 502 sanitized on LLM failure. Fire HD 8 mobile viewport test at 50ms/char preserved all typed characters — no dropouts."
+}

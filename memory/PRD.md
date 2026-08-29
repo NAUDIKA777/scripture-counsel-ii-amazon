@@ -105,3 +105,42 @@ submission. The web production site (`wisdominword.com`) still uses Stripe.
   full submission.
 - **P2** — Enable the RevenueCat webhook for cross-device analytics
   (`REVENUECAT_WEBHOOK_AUTH` on backend + webhook URL in RevenueCat).
+
+
+## Implemented (2026-02-24) — Fire OS Input Crash & Search Reliability Fixes
+
+Amazon reviewers reported input dropouts / UI freezes / crashes when typing
+into the counsel input on Fire tablets. Root cause + fixes applied:
+
+- **IME composition guard** (`Hero.js`, `Home.js` follow-up bar): checks
+  `e.nativeEvent.isComposing` AND legacy `keyCode === 229` before firing
+  Enter-submit. This was the primary reviewer bug — Fire OS's forked
+  Chromium fires Enter keydown while predictive-text composition is still
+  in-flight, which triggered a submit mid-reflow and dropped characters
+  or crashed the WebView.
+- **Submit debounce** (`useRef` lastSubmit lockout, 500 ms): rapid double-
+  Enter now fires exactly ONE `POST /api/ask`. Verified in Playwright.
+- **Axios timeout** (`lib/api.js`): 45 s hard timeout, no more infinite
+  spinners on stalled Fire OS TLS drops.
+- **safeErrorMessage()** helper: never toasts objects/arrays; extracts the
+  first FastAPI validation msg and truncates to 240 chars.
+- **validateQuestion() + MAX_QUESTION_LEN=2000**: whitespace-only /
+  oversize blocked client-side; special chars (quotes, em-dashes,
+  `<script>alert(1)</script>`, unicode) pass through and are safely JSON-
+  escaped by the backend.
+- **ErrorBoundary** wraps the whole page AND each `ConversationCard`
+  individually, so a bad payload from a single card cannot crash the app.
+  Fallback UI has a "Reload" button that preserves session id and free
+  counter.
+- **Correct mobile input attrs**: `enterKeyHint="send"`, `inputMode="text"`,
+  `autoCorrect="off"`, `spellCheck={false}`, `autoCapitalize="sentences"`,
+  `maxLength` enforced on both hero textarea and follow-up input.
+- **Safe-area padding** on the sticky follow-up bar
+  (`env(safe-area-inset-bottom)`) so it clears the Fire OS gesture bar.
+- **Backend** `server.py /api/ask`: caps at 2000 chars, returns kind 400
+  messages for empty/whitespace/oversize, returns 502 with a sanitized
+  message on LLM failure (raw exception text never leaks).
+
+Verified by testing agent (iteration_12): 8/8 backend + 12/12 frontend
+tests pass, including Fire HD 8 mobile viewport keyboard.type at 50 ms/char
+with zero character drops. Test file: `backend/tests/test_ask_amazon.py`.
