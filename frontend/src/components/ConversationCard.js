@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import axios from "axios";
 import { toast } from "sonner";
+import { api, safeErrorMessage } from "@/lib/api";
 import { Volume2, Pause, Loader2 } from "lucide-react";
 import ScriptureCard from "@/components/ScriptureCard";
 import LocationCard from "@/components/LocationCard";
@@ -8,7 +8,7 @@ import IllustrationCard from "@/components/IllustrationCard";
 
 const audioBars = [0, 1, 2, 3, 4];
 
-export default function ConversationCard({ convo, api }) {
+export default function ConversationCard({ convo }) {
   const [audioUrl, setAudioUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -32,8 +32,8 @@ export default function ConversationCard({ convo, api }) {
     }
     setLoading(true);
     try {
-      const res = await axios.post(
-        `${api}/tts`,
+      const res = await api.post(
+        "/tts",
         { text: convo.answer },
         { responseType: "blob" }
       );
@@ -41,17 +41,16 @@ export default function ConversationCard({ convo, api }) {
       setAudioUrl(url);
       setTimeout(() => audioRef.current?.play(), 50);
     } catch (e) {
-      const msg = e?.response?.data
-        ? (typeof e.response.data === "string" ? e.response.data : "The statesman voice is not yet configured.")
-        : "Could not load audio.";
-      // Try parse blob error
+      // FastAPI errors come back as a Blob because responseType is "blob";
+      // read it before falling back to the generic message.
+      let message = safeErrorMessage(e, "Could not load audio.");
       try {
-        const text = await e.response.data.text();
-        const j = JSON.parse(text);
-        toast.error(j.detail || msg);
+        const detail = JSON.parse(await e.response.data.text())?.detail;
+        if (typeof detail === "string" && detail.trim()) message = detail;
       } catch {
-        toast.error(msg);
+        /* not a JSON blob — keep the generic message */
       }
+      toast.error(message);
     } finally {
       setLoading(false);
     }

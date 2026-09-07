@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Copy, Check, X as XIcon, Loader2 } from "lucide-react";
+import { useHardwareBackDismiss } from "@/hooks/useHardwareBackDismiss";
 
 /**
  * Small modal that shows a shareable URL + quick-share buttons for X, WhatsApp,
@@ -14,6 +15,9 @@ export default function ShareLinkDialog({ open, onClose, shareUrl, verseRef, ver
   useEffect(() => {
     if (!open) setCopied(false);
   }, [open]);
+
+  // Hardware back closes the dialog instead of exiting the app (Fire OS).
+  useHardwareBackDismiss(open, onClose);
 
   if (!open) return null;
 

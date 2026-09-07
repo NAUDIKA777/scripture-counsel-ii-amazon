@@ -1,12 +1,10 @@
 import React, { useRef, useState } from "react";
-import axios from "axios";
 import { toast } from "sonner";
 import { Quote, Share2, Download, Loader2, Check, Link2 } from "lucide-react";
 import { toPng } from "html-to-image";
 import ShareableVerse from "@/components/ShareableVerse";
 import ShareLinkDialog from "@/components/ShareLinkDialog";
-
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+import { api, safeErrorMessage, publicShareOrigin } from "@/lib/api";
 
 export default function ScriptureCard({ reference, index }) {
   const shareRef = useRef(null);
@@ -109,13 +107,13 @@ export default function ScriptureCard({ reference, index }) {
         verse: String(reference.verse),
         text: reference.text,
         image_data_url: dataUrl,
-        origin_url: window.location.origin,
+        origin_url: publicShareOrigin(),
       };
-      const res = await axios.post(`${API}/shares`, payload);
+      const res = await api.post("/shares", payload);
       setLinkDialog({ open: true, url: res.data.share_url });
     } catch (e) {
       console.error(e);
-      toast.error(e?.response?.data?.detail || "Could not create the shareable link.");
+      toast.error(safeErrorMessage(e, "Could not create the shareable link."));
     } finally {
       setLinking(false);
     }

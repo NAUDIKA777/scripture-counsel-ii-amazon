@@ -8,7 +8,7 @@ import VerseOfDay from "@/components/VerseOfDay";
 import Paywall from "@/components/Paywall";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useAccess } from "@/hooks/useAccess";
-import { api, API_BASE, safeErrorMessage, validateQuestion, MAX_QUESTION_LEN } from "@/lib/api";
+import { api, safeErrorMessage, validateQuestion, MAX_QUESTION_LEN } from "@/lib/api";
 
 const SESSION_KEY = "wisdom_session_id";
 const SUBMIT_LOCKOUT_MS = 500; // Debounce submits so rapid Enter presses cannot fire concurrent /ask calls
@@ -213,7 +213,7 @@ export default function Home() {
         />
 
         <main className="relative z-10 mx-auto max-w-5xl px-6 md:px-10 pb-32">
-          <VerseOfDay api={API_BASE} />
+          <VerseOfDay />
 
           {conversations.length > 0 && (
             <section ref={answersRef} className="mt-16" data-testid="answers-section">
@@ -235,7 +235,7 @@ export default function Home() {
                     >
                       {/* Isolate each card so a single bad payload cannot crash the page */}
                       <ErrorBoundary>
-                        <ConversationCard convo={c} api={API_BASE} />
+                        <ConversationCard convo={c} />
                       </ErrorBoundary>
                     </motion.div>
                   ))}

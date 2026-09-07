@@ -16,9 +16,28 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Release signing for the Amazon Appstore upload. Credentials are never
+    // committed: set them in ~/.gradle/gradle.properties (or as environment
+    // variables) before running ./gradlew assembleRelease. If they are absent
+    // the build still succeeds and produces an unsigned APK.
+    signingConfigs {
+        release {
+            def keystorePath = project.findProperty('WW_KEYSTORE_FILE') ?: System.getenv('WW_KEYSTORE_FILE')
+            if (keystorePath) {
+                storeFile file(keystorePath)
+                storePassword project.findProperty('WW_KEYSTORE_PASSWORD') ?: System.getenv('WW_KEYSTORE_PASSWORD')
+                keyAlias project.findProperty('WW_KEY_ALIAS') ?: System.getenv('WW_KEY_ALIAS')
+                keyPassword project.findProperty('WW_KEY_PASSWORD') ?: System.getenv('WW_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
+            if (project.findProperty('WW_KEYSTORE_FILE') ?: System.getenv('WW_KEYSTORE_FILE')) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
+            zipAlignEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
@@ -52,11 +71,6 @@ dependencies {
 
 apply from: 'capacitor.build.gradle'
 
-try {
-    def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
-        apply plugin: 'com.google.gms.google-services'
-    }
-} catch(Exception e) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
-}
+// Amazon Appstore edition: no google-services.json / Firebase plugin is applied.
+// Fire OS devices ship without Google Play Services, so nothing here may depend
+// on it.

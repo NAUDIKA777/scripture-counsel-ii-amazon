@@ -15,6 +15,7 @@ import {
   restorePurchases,
   isNativeAmazonBuild,
 } from "@/lib/revenuecat";
+import { useHardwareBackDismiss } from "@/hooks/useHardwareBackDismiss";
 
 const benefits = [
   { icon: ScrollText, label: "Unlimited counsel from Scripture" },
@@ -26,6 +27,9 @@ const benefits = [
 export default function Paywall({ open, onClose, onUnlock, reason }) {
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
+
+  // Hardware back closes the paywall instead of exiting the app (Fire OS).
+  useHardwareBackDismiss(open && !purchasing, onClose);
 
   if (!open) return null;
 

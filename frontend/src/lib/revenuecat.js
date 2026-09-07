@@ -50,10 +50,11 @@ export function incrementFreeCount() {
 
 // -------------- Platform detection ------------------------------------------
 export function isNativeAmazonBuild() {
-  // Capacitor.isNativePlatform() is true inside the Capacitor Android wrapper.
-  // In a plain web browser it is false, so we treat that as "no native IAP".
+  // The Amazon Appstore edition is the only native target we ship, and it is an
+  // Android (Fire OS) package. Anything else — browser preview, desktop — has
+  // no Amazon IAP available.
   try {
-    return Capacitor.isNativePlatform();
+    return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
   } catch {
     return false;
   }
@@ -61,9 +62,13 @@ export function isNativeAmazonBuild() {
 
 // -------------- RevenueCat lifecycle ----------------------------------------
 let configured = false;
+let configuring = null;
 
 export async function configureRevenueCat() {
   if (!isNativeAmazonBuild() || configured) return;
+  // Several call sites (useAccess mount, purchase, restore) can race; configure
+  // exactly once, otherwise the SDK throws "already configured".
+  if (configuring) return configuring;
 
   const apiKey = process.env.REACT_APP_REVENUECAT_AMAZON_PUBLIC_KEY;
   if (!apiKey) {
@@ -72,13 +77,24 @@ export async function configureRevenueCat() {
     );
     return;
   }
-  await Purchases.setLogLevel({ level: LOG_LEVEL.WARN });
-  await Purchases.configure({
-    apiKey,
-    appUserID: getAppUserId(),
-    useAmazon: true,
-  });
-  configured = true;
+
+  configuring = (async () => {
+    await Purchases.setLogLevel({ level: LOG_LEVEL.WARN });
+    // useAmazon:true routes every purchase through Amazon In-App Purchasing.
+    // Google Play Billing is never initialised in this build.
+    await Purchases.configure({
+      apiKey,
+      appUserID: getAppUserId(),
+      useAmazon: true,
+    });
+    configured = true;
+  })();
+
+  try {
+    await configuring;
+  } finally {
+    configuring = null;
+  }
 }
 
 // Returns true if the "premium" entitlement is active on the current device.

@@ -46,14 +46,26 @@ cd android
 ./gradlew clean assembleRelease
 ```
 
-The signed unaligned APK lands at:
+`android/app/build.gradle` now contains a release signing config that reads
+credentials from Gradle properties (or the same environment variables), so put
+this in `~/.gradle/gradle.properties` before building:
+
+```properties
+WW_KEYSTORE_FILE=/absolute/path/to/wisdomandword-release.keystore
+WW_KEYSTORE_PASSWORD=…
+WW_KEY_ALIAS=wisdomandword
+WW_KEY_PASSWORD=…
+```
+
+With those set, `assembleRelease` emits a signed, zip-aligned APK at:
 
 ```
-frontend/android/app/build/outputs/apk/release/app-release-unsigned.apk
+frontend/android/app/build/outputs/apk/release/app-release.apk
 ```
 
-Sign it with your Amazon keystore (`jarsigner` + `zipalign`) or configure a
-signing config in `android/app/build.gradle` before `assembleRelease`.
+Without them the build still succeeds and produces
+`app-release-unsigned.apk`, which you can sign manually
+(`jarsigner` + `zipalign`).
 
 ---
 
@@ -108,8 +120,12 @@ Same procedure as before:
 
 ## Current environment
 
-- `frontend/.env → REACT_APP_REVENUECAT_AMAZON_PUBLIC_KEY = amzn_oBFPlvVmUDQAdMgWSmvQOtLECVV`
-  ✅ pasted
+- `frontend/.env.production` is committed and is what `yarn build` uses:
+  `REACT_APP_BACKEND_URL=https://scripture-counsel-2.emergent.host`,
+  `REACT_APP_REVENUECAT_AMAZON_PUBLIC_KEY=amzn_oBFPlvVmUDQAdMgWSmvQOtLECVV`,
+  `REACT_APP_FREE_COUNSEL_LIMIT=3`. If the backend host ever changes, update
+  that file **and** `PRODUCTION_BACKEND_URL` in `frontend/src/lib/api.js`
+  (the hard fallback used when no env value is present).
 - `backend/.env → REVENUECAT_WEBHOOK_AUTH` is empty. Fill it later with any
   long random string if you want the cross-device webhook ledger; then paste
   the same value as `Bearer <string>` into

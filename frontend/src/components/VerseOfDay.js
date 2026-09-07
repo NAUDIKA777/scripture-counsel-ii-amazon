@@ -1,21 +1,21 @@
 import React, { useEffect, useRef, useState } from "react";
-import axios from "axios";
 import { Sun, Share2, Download, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
 import { toPng } from "html-to-image";
 import ShareableVerse from "@/components/ShareableVerse";
+import { api } from "@/lib/api";
 
-export default function VerseOfDay({ api }) {
+export default function VerseOfDay() {
   const [verse, setVerse] = useState(null);
   const [busy, setBusy] = useState(false);
   const [justSent, setJustSent] = useState(false);
   const shareRef = useRef(null);
 
   useEffect(() => {
-    axios.get(`${api}/verse-of-day`)
+    api.get("/verse-of-day")
       .then((r) => setVerse(r.data))
       .catch(() => {});
-  }, [api]);
+  }, []);
 
   const filename = () =>
     verse

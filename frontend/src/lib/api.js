@@ -1,6 +1,22 @@
 import axios from "axios";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+// Production backend used by the packaged Amazon Appstore build. Inside the
+// Capacitor WebView the page is served from http://localhost, so relative URLs
+// and window.location.origin can never reach the API — an absolute HTTPS origin
+// is mandatory there.
+export const PRODUCTION_BACKEND_URL = "https://scripture-counsel-2.emergent.host";
+
+function resolveBackendUrl() {
+  const fromEnv = (process.env.REACT_APP_BACKEND_URL || "").trim();
+  if (fromEnv && /^https?:\/\//i.test(fromEnv)) {
+    return fromEnv.replace(/\/+$/, "");
+  }
+  // No usable env value (missing .env at build time). Never fall through to
+  // "undefined/api" — that produced a hard-fail on every request in the APK.
+  return PRODUCTION_BACKEND_URL;
+}
+
+const BACKEND_URL = resolveBackendUrl();
 const API_BASE = `${BACKEND_URL}/api`;
 
 // Central axios instance for the app. Every request has a 45s hard timeout so
@@ -13,7 +29,20 @@ export const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-export { API_BASE };
+export { API_BASE, BACKEND_URL };
+
+/**
+ * Origin to embed in publicly shared links. Inside the Capacitor WebView
+ * window.location.origin is http(s)://localhost, which would hand friends a
+ * dead link, so the public production host is used for any local origin.
+ */
+export function publicShareOrigin() {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  if (!origin || !/^https?:/i.test(origin) || /\/\/localhost(:\d+)?$/i.test(origin)) {
+    return PRODUCTION_BACKEND_URL;
+  }
+  return origin;
+}
 
 // Maximum question length accepted by the backend. Enforced client-side so
 // Fire OS soft keyboards with predictive text can't paste 100 KB of text
