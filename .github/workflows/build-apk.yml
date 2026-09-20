@@ -22,7 +22,7 @@ name: Build Amazon Appstore APK
 on:
   push:
     branches: [main]
-    tags: ['v*'] 
+    tags: ['v*']
   workflow_dispatch:
 
 jobs:
@@ -40,6 +40,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '21'
+
       - name: Set up Node 20
         uses: actions/setup-node@v4
         with:
@@ -131,17 +132,18 @@ jobs:
           PY
           grep -n "signingConfig" build.gradle | head -5
 
-               - name: Build release APK
-          working-directory: frontend/android
-          env:
+      - name: Build release APK
+        working-directory: frontend/android
+        env:
           WW_KEYSTORE_FILE: ${{ github.workspace }}/frontend/android/app/release.keystore
           WW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           WW_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           WW_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          run: |
+        run: |
           set -euo pipefail
           chmod +x gradlew
           ./gradlew --no-daemon clean assembleRelease --stacktrace
+
       - name: Rename APK
         id: rename
         working-directory: frontend/android/app/build/outputs/apk/release
@@ -149,7 +151,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          VERSION=$(sed -n 's/^[[:space:]]*versionName[[:space:]]*"\([^"]*\)".*/\1/p' ../../../build.gradle | head -n 1)
+          VERSION=$(sed -n 's/^[[:space:]]*versionName[[:space:]]*"\([^"]*\)".*/\1/p' "${GITHUB_WORKSPACE}/frontend/android/app/build.gradle" | head -n 1)
           if [ -z "$VERSION" ]; then
             echo "::error::Could not determine versionName"
             exit 1
@@ -169,6 +171,7 @@ jobs:
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "path=frontend/android/app/build/outputs/apk/release/$NAME" >> "$GITHUB_OUTPUT"
           ls -lh
+
       # ---- Publish -------------------------------------------------------
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
