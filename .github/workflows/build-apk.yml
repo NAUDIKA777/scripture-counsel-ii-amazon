@@ -131,7 +131,7 @@ jobs:
           PY
           grep -n "signingConfig" build.gradle | head -5
 
-           - name: Build release APK
+               - name: Build release APK
           working-directory: frontend/android
           env:
           WW_KEYSTORE_FILE: ${{ github.workspace }}/frontend/android/app/release.keystore
@@ -139,9 +139,9 @@ jobs:
           WW_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           WW_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           run: |
-            chmod +x gradlew
-            ./gradlew --no-daemon clean assembleRelease --stacktrace
-
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon clean assembleRelease --stacktrace
       - name: Rename APK
         id: rename
         working-directory: frontend/android/app/build/outputs/apk/release
