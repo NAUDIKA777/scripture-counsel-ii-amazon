@@ -148,7 +148,7 @@ jobs:
           VERSION=$(grep versionName ../../../../build.gradle | head -1 | awk -F'"' '{print $2}')
           COMMIT_SHORT=$(git -C "${{ github.workspace }}" rev-parse --short HEAD)
           NAME="wisdomandword-amazon-v${VERSION}-${COMMIT_SHORT}.apk"
-          mv app-release.apk "$NAME"
+          mv *.apk "NAME"
           ls -lh
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "path=frontend/android/app/build/outputs/apk/release/$NAME" >> "$GITHUB_OUTPUT"
