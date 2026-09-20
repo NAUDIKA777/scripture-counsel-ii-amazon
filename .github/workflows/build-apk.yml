@@ -86,7 +86,7 @@ jobs:
             echo "::error::ANDROID_KEYSTORE_B64 secret missing"
             exit 1
           fi
-          echo "$KS_B64" | base64 -d > frontend/android/app/release.keystore
+          echo "$KS_B64" | base64 -d-1 > frontend/android/app/release.keystore
 
       # ---- Build web bundle & sync into android/ -------------------------
       - name: Install web deps
