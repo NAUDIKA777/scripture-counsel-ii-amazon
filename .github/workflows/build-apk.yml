@@ -131,28 +131,44 @@ jobs:
           PY
           grep -n "signingConfig" build.gradle | head -5
 
-      - name: Build release APK
-        working-directory: frontend/android
-        env:
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          chmod +x gradlew
-          ./gradlew --no-daemon clean assembleRelease --stacktrace
+           - name: Build release APK
+          working-directory: frontend/android
+          env:
+          WW_KEYSTORE_FILE: ${{ github.workspace }}/frontend/android/app/release.keystore
+          WW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          WW_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          WW_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          run: |
+            chmod +x gradlew
+            ./gradlew --no-daemon clean assembleRelease --stacktrace
 
       - name: Rename APK
         id: rename
         working-directory: frontend/android/app/build/outputs/apk/release
+        shell: bash
         run: |
-          VERSION=$(grep versionName ../../../../build.gradle | head -1 | awk -F'"' '{print $2}')
+          set -euo pipefail
+
+          VERSION=$(sed -n 's/^[[:space:]]*versionName[[:space:]]*"\([^"]*\)".*/\1/p' ../../../build.gradle | head -n 1)
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not determine versionName"
+            exit 1
+          fi
+
           COMMIT_SHORT=$(git -C "${{ github.workspace }}" rev-parse --short HEAD)
           NAME="wisdomandword-amazon-v${VERSION}-${COMMIT_SHORT}.apk"
-          mv *.apk "NAME"
-          ls -lh
+
+          APK=$(find . -maxdepth 1 -type f -name '*.apk' -print -quit)
+          if [ -z "$APK" ]; then
+            echo "::error::No release APK was produced"
+            exit 1
+          fi
+
+          mv "$APK" "$NAME"
+
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "path=frontend/android/app/build/outputs/apk/release/$NAME" >> "$GITHUB_OUTPUT"
-
+          ls -lh
       # ---- Publish -------------------------------------------------------
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
