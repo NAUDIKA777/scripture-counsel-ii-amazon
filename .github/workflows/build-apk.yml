@@ -13,7 +13,7 @@ name: Build Amazon Appstore APK
 #   ANDROID_KEYSTORE_PASSWORD           — keystore password
 #   ANDROID_KEY_ALIAS                   — key alias inside the keystore
 #   ANDROID_KEY_PASSWORD                — key password
-#   REVENUECAT_AMAZON_PUBLIC_KEY        — amzn_... (mirrors frontend/.env)
+#   REVENUECAT_AMAZON_API_KEY       — amzn_... (mirrors frontend/.env)
 #
 # Encode files to base64 (macOS/Linux):
 #   base64 -i AppstoreAuthenticationKey.pem | pbcopy       # macOS
@@ -62,7 +62,7 @@ jobs:
             echo "WDS_SOCKET_PORT=443"
             echo "ENABLE_HEALTH_CHECK=false"
             echo "REACT_APP_FREE_COUNSEL_LIMIT=3"
-            echo "REACT_APP_REVENUECAT_AMAZON_PUBLIC_KEY=${{ secrets.REVENUECAT_AMAZON_PUBLIC_KEY }}"
+            echo "REACT_APP_REVENUECAT_AMAZON_API_KEY=${{ secrets.REVENUECAT_AMAZON_PUBLIC_KEY }}"
           } > .env
 
       - name: Restore Amazon PEM key
