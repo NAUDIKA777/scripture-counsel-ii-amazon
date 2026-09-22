@@ -36,8 +36,10 @@ android {
             if (project.findProperty('WW_KEYSTORE_FILE') ?: System.getenv('WW_KEYSTORE_FILE')) {
                 signingConfig signingConfigs.release
             }
+            // R8 shrinking stays off: RevenueCat's Kotlin metadata tripped R8 in CI.
+            // Release APKs are always zip-aligned, so no zipAlignEnabled is needed.
             minifyEnabled false
-            zipAlignEnabled true
+            shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
@@ -66,7 +68,7 @@ dependencies {
     // resolves transitively. If your local Gradle prints a "Runtime classpath
     // has conflicting versions" warning, bump both artifacts to the version
     // reported by hybrid-common's transitive dependency.
-    implementation "com.revenuecat.purchases:purchases-store-amazon:10.15.1"
+    implementation "com.revenuecat.purchases:purchases-store-amazon:10.17.0"
 }
 
 apply from: 'capacitor.build.gradle'
