@@ -86,8 +86,17 @@ jobs:
             echo "::error::ANDROID_KEYSTORE_B64 secret missing"
             exit 1
           fi
-          # Strip any spaces/newlines/CRs pasted into the secret, then decode (GNU coreutils).
-          printf '%s' "$KS_B64" | tr -d ' \r\n' | base64 --decode > frontend/android/app/release.keystore
+          # Normalise the secret: drop all whitespace and quotes, any "data:...;base64,"
+          # prefix, map URL-safe chars (-_) to standard (+/), restore missing "=" padding.
+          KS_CLEAN=$(printf '%s' "$KS_B64" | tr -d "[:space:]\"'" | tr -- '-_' '+/')
+          KS_CLEAN="${KS_CLEAN#data:*base64,}"
+          while [ $(( ${#KS_CLEAN} % 4 )) -ne 0 ]; do KS_CLEAN="${KS_CLEAN}="; done
+          if ! printf '%s' "$KS_CLEAN" | base64 --decode > frontend/android/app/release.keystore; then
+            # Diagnostics only — never print the secret itself.
+            BAD=$(printf '%s' "$KS_CLEAN" | tr -d 'A-Za-z0-9+/=' | fold -w1 | sort -u | tr -d '\n')
+            echo "::error::ANDROID_KEYSTORE_B64 is not valid base64 (length ${#KS_CLEAN}, invalid chars: '${BAD:-none}'). Re-encode with 'base64 -w0 your.keystore' and paste the output as the secret."
+            exit 1
+          fi
           if [ ! -s frontend/android/app/release.keystore ]; then
             echo "::error::Decoded keystore is empty — re-encode with 'base64 -w0' and update ANDROID_KEYSTORE_B64"
             exit 1
