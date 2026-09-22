@@ -86,7 +86,13 @@ jobs:
             echo "::error::ANDROID_KEYSTORE_B64 secret missing"
             exit 1
           fi
-          echo "$KS_B64" | base64 -d-1 > frontend/android/app/release.keystore
+          # Strip any spaces/newlines/CRs pasted into the secret, then decode (GNU coreutils).
+          printf '%s' "$KS_B64" | tr -d ' \r\n' | base64 --decode > frontend/android/app/release.keystore
+          if [ ! -s frontend/android/app/release.keystore ]; then
+            echo "::error::Decoded keystore is empty — re-encode with 'base64 -w0' and update ANDROID_KEYSTORE_B64"
+            exit 1
+          fi
+          ls -l frontend/android/app/release.keystore
 
       # ---- Build web bundle & sync into android/ -------------------------
       - name: Install web deps
