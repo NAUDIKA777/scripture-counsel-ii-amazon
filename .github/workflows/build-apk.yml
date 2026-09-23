@@ -9,11 +9,10 @@ name: Build Amazon Appstore APK
 #
 # Required repository secrets (Settings → Secrets and variables → Actions):
 #   APPSTORE_AUTHENTICATION_KEY_PEM_B64 — base64 of AppstoreAuthenticationKey.pem
-#   ANDROID_KEYSTORE_B64                — base64 of your release keystore file
-#   ANDROID_KEYSTORE_PASSWORD           — keystore password
-#   ANDROID_KEY_ALIAS                   — key alias inside the keystore
-#   ANDROID_KEY_PASSWORD                — key password
-#   REVENUECAT_AMAZON_API_KEY       — amzn_... (mirrors frontend/.env)
+#   REVENUECAT_AMAZON_PUBLIC_KEY        — amzn_... (mirrors frontend/.env)
+#
+# The release keystore is generated automatically on each run with keytool
+# (alias: wisdomkey), so no keystore secrets are required.
 #
 # Encode files to base64 (macOS/Linux):
 #   base64 -i AppstoreAuthenticationKey.pem | pbcopy       # macOS
@@ -38,7 +37,7 @@ jobs:
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '21'
 
       - name: Set up Node 20
@@ -62,7 +61,7 @@ jobs:
             echo "WDS_SOCKET_PORT=443"
             echo "ENABLE_HEALTH_CHECK=false"
             echo "REACT_APP_FREE_COUNSEL_LIMIT=3"
-            echo "REACT_APP_REVENUECAT_AMAZON_API_KEY=${{ secrets.REVENUECAT_AMAZON_PUBLIC_KEY }}"
+            echo "REACT_APP_REVENUECAT_AMAZON_PUBLIC_KEY=${{ secrets.REVENUECAT_AMAZON_PUBLIC_KEY }}"
           } > .env
 
       - name: Restore Amazon PEM key
@@ -78,30 +77,21 @@ jobs:
           rm -f frontend/android/app/src/main/assets/PLACE_AMAZON_PEM_HERE.txt
           ls -l frontend/android/app/src/main/assets/AppstoreAuthenticationKey.pem
 
-      - name: Restore Android keystore
-        env:
-          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+      - name: Generate Android keystore
         run: |
-          if [ -z "$KS_B64" ]; then
-            echo "::error::ANDROID_KEYSTORE_B64 secret missing"
-            exit 1
-          fi
-          # Normalise the secret: drop all whitespace and quotes, any "data:...;base64,"
-          # prefix, map URL-safe chars (-_) to standard (+/), restore missing "=" padding.
-          KS_CLEAN=$(printf '%s' "$KS_B64" | tr -d "[:space:]\"'" | tr -- '-_' '+/')
-          KS_CLEAN="${KS_CLEAN#data:*base64,}"
-          while [ $(( ${#KS_CLEAN} % 4 )) -ne 0 ]; do KS_CLEAN="${KS_CLEAN}="; done
-          if ! printf '%s' "$KS_CLEAN" | base64 --decode > frontend/android/app/release.keystore; then
-            # Diagnostics only — never print the secret itself.
-            BAD=$(printf '%s' "$KS_CLEAN" | tr -d 'A-Za-z0-9+/=' | fold -w1 | sort -u | tr -d '\n')
-            echo "::error::ANDROID_KEYSTORE_B64 is not valid base64 (length ${#KS_CLEAN}, invalid chars: '${BAD:-none}'). Re-encode with 'base64 -w0 your.keystore' and paste the output as the secret."
-            exit 1
-          fi
-          if [ ! -s frontend/android/app/release.keystore ]; then
-            echo "::error::Decoded keystore is empty — re-encode with 'base64 -w0' and update ANDROID_KEYSTORE_B64"
-            exit 1
-          fi
-          ls -l frontend/android/app/release.keystore
+          KEYSTORE_PATH="frontend/android/app/release.keystore"
+          rm -f "$KEYSTORE_PATH"
+          keytool -genkeypair -v \
+            -keystore "$KEYSTORE_PATH" \
+            -storetype PKCS12 \
+            -alias 'wisdomkey' \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass 'WisdomPass123!' \
+            -keypass 'WisdomPass123!' \
+            -dname "CN=Wisdom and Word, OU=Mobile, O=Wisdom and Word, L=Unknown, ST=Unknown, C=US"
+          ls -l "$KEYSTORE_PATH"
 
       # ---- Build web bundle & sync into android/ -------------------------
       - name: Install web deps
@@ -131,9 +121,9 @@ jobs:
                   "    signingConfigs {\n"
                   "        release {\n"
                   "            storeFile file(\"release.keystore\")\n"
-                  "            storePassword System.getenv(\"ANDROID_KEYSTORE_PASSWORD\")\n"
-                  "            keyAlias System.getenv(\"ANDROID_KEY_ALIAS\")\n"
-                  "            keyPassword System.getenv(\"ANDROID_KEY_PASSWORD\")\n"
+                  "            storePassword \"WisdomPass123!\"\n"
+                  "            keyAlias \"wisdomkey\"\n"
+                  "            keyPassword \"WisdomPass123!\"\n"
                   "        }\n"
                   "    }\n"
               )
@@ -149,43 +139,21 @@ jobs:
 
       - name: Build release APK
         working-directory: frontend/android
-        env:
-          WW_KEYSTORE_FILE: ${{ github.workspace }}/frontend/android/app/release.keystore
-          WW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          WW_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          WW_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          set -euo pipefail
           chmod +x gradlew
           ./gradlew --no-daemon clean assembleRelease --stacktrace
 
       - name: Rename APK
         id: rename
         working-directory: frontend/android/app/build/outputs/apk/release
-        shell: bash
         run: |
-          set -euo pipefail
-
-          VERSION=$(sed -n 's/^[[:space:]]*versionName[[:space:]]*"\([^"]*\)".*/\1/p' "${GITHUB_WORKSPACE}/frontend/android/app/build.gradle" | head -n 1)
-          if [ -z "$VERSION" ]; then
-            echo "::error::Could not determine versionName"
-            exit 1
-          fi
-
+          VERSION=$(grep versionName ../../../../build.gradle | head -1 | awk -F'"' '{print $2}')
           COMMIT_SHORT=$(git -C "${{ github.workspace }}" rev-parse --short HEAD)
           NAME="wisdomandword-amazon-v${VERSION}-${COMMIT_SHORT}.apk"
-
-          APK=$(find . -maxdepth 1 -type f -name '*.apk' -print -quit)
-          if [ -z "$APK" ]; then
-            echo "::error::No release APK was produced"
-            exit 1
-          fi
-
-          mv "$APK" "$NAME"
-
+          mv app-release.apk "$NAME"
+          ls -lh
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "path=frontend/android/app/build/outputs/apk/release/$NAME" >> "$GITHUB_OUTPUT"
-          ls -lh
 
       # ---- Publish -------------------------------------------------------
       - name: Upload APK artifact
