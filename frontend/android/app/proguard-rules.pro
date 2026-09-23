@@ -19,3 +19,16 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# ---- RevenueCat (Amazon Appstore build) ------------------------------------
+# minifyEnabled is currently false, so these only take effect if R8 shrinking
+# is turned back on. They keep R8 from failing on RevenueCat's Kotlin
+# metadata and on optional classes it references but doesn't ship.
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
+-keep class kotlin.Metadata { *; }
+-keep class com.revenuecat.purchases.** { *; }
+-dontwarn com.revenuecat.purchases.**
+-keep class com.amazon.device.iap.** { *; }
+-dontwarn com.amazon.device.iap.**
+-dontwarn kotlinx.coroutines.**
+-dontwarn org.jetbrains.annotations.**
