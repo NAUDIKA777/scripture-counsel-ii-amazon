@@ -145,15 +145,30 @@ jobs:
 
       - name: Rename APK
         id: rename
-        working-directory: frontend/android/app/build/outputs/apk/release
         run: |
-          VERSION=$(grep versionName ../../../../build.gradle | head -1 | awk -F'"' '{print $2}')
-          COMMIT_SHORT=$(git -C "${{ github.workspace }}" rev-parse --short HEAD)
+          echo "--- APK files produced by the build ---"
+          find frontend/android/app/build/outputs -name "*.apk" -exec ls -lh {} \; 2>/dev/null || true
+          # Prefer the signed APK; otherwise take whatever release APK Gradle produced.
+          APK_PATH="frontend/android/app/build/outputs/apk/release/app-release.apk"
+          if [ ! -f "$APK_PATH" ]; then
+            APK_PATH=$(find frontend/android/app/build/outputs/apk -path "*release*" -name "*.apk" | head -1)
+          fi
+          if [ -z "$APK_PATH" ] || [ ! -f "$APK_PATH" ]; then
+            echo "::error::No release APK found under frontend/android/app/build/outputs/apk"
+            exit 1
+          fi
+          case "$APK_PATH" in
+            *unsigned*) echo "::warning::Using UNSIGNED APK ($APK_PATH) — the signing config was not applied." ;;
+          esac
+          echo "Using APK: $APK_PATH"
+          APK_DIR=$(dirname "$APK_PATH")
+          VERSION=$(grep versionName frontend/android/app/build.gradle | head -1 | awk -F'"' '{print $2}')
+          COMMIT_SHORT=$(git rev-parse --short HEAD)
           NAME="wisdomandword-amazon-v${VERSION}-${COMMIT_SHORT}.apk"
-          mv app-release.apk "$NAME"
-          ls -lh
+          mv "$APK_PATH" "$APK_DIR/$NAME"
+          ls -lh "$APK_DIR"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
-          echo "path=frontend/android/app/build/outputs/apk/release/$NAME" >> "$GITHUB_OUTPUT"
+          echo "path=$APK_DIR/$NAME" >> "$GITHUB_OUTPUT"
 
       # ---- Publish -------------------------------------------------------
       - name: Upload APK artifact
