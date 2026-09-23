@@ -4,7 +4,7 @@ import axios from "axios";
 // Capacitor WebView the page is served from http://localhost, so relative URLs
 // and window.location.origin can never reach the API — an absolute HTTPS origin
 // is mandatory there.
-export const PRODUCTION_BACKEND_URL = "https://wisdominword.com 
+export const PRODUCTION_BACKEND_URL = "https://wisdominword.com";  
 
 function resolveBackendUrl() {
   const fromEnv = (process.env.REACT_APP_BACKEND_URL || "").trim();
