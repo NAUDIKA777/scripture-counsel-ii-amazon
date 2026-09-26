@@ -163,7 +163,7 @@ export default function Home() {
                   <span
                     data-testid="access-pill-pro"
                     aria-label="Premium active"
-                    title="Manage from Your Amazon → Memberships & Subscriptions"
+                    title="Manage from Google Play → Payments & subscriptions → Subscriptions"
                     className="hidden sm:inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[10px] uppercase tracking-widest border"
                     style={{ borderColor: "rgba(212,175,55,0.5)", color: "var(--gold)" }}
                   >

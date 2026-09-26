@@ -1,13 +1,13 @@
-// RevenueCat + Amazon Appstore billing wrapper.
+// RevenueCat + Google Play Billing wrapper.
 //
-// This build ships to the Amazon Appstore only. RevenueCat's native purchase
-// flow is invoked via the Capacitor plugin. When the code runs in a regular
-// browser (e.g. the developer preview or a desktop tester), every method here
-// safely no-ops so the UI still renders — but no purchase can be attempted.
+// This build ships to Google Play only. RevenueCat's native purchase flow is
+// invoked via the Capacitor plugin. When the code runs in a regular browser
+// (e.g. the developer preview or a desktop tester), every method here safely
+// no-ops so the UI still renders — but no purchase can be attempted.
 //
 // Entitlement identifier is "premium" (matches the RevenueCat dashboard).
-// Product SKU is the Amazon MONTHLY TERM SKU (parent.child), configured in the
-// Amazon Developer Console and mirrored in the RevenueCat product catalog.
+// Product is the Google Play monthly subscription, configured in the Play
+// Console and mirrored in the RevenueCat product catalog.
 
 import { Capacitor } from "@capacitor/core";
 import {
@@ -16,7 +16,7 @@ import {
 } from "@revenuecat/purchases-capacitor";
 
 export const PREMIUM_ENTITLEMENT = "premium";
-export const AMAZON_MONTHLY_SKU = "com.wisdomandword.premium.monthly";
+export const GOOGLE_PLAY_MONTHLY_SUBSCRIPTION_ID = "com.wisdomandword.premium.monthly";
 
 const APP_USER_ID_KEY = "wisdom_user_id";
 const FREE_COUNT_KEY = "wisdom_free_counsel_count";
@@ -49,10 +49,9 @@ export function incrementFreeCount() {
 }
 
 // -------------- Platform detection ------------------------------------------
-export function isNativeAmazonBuild() {
-  // The Amazon Appstore edition is the only native target we ship, and it is an
-  // Android (Fire OS) package. Anything else — browser preview, desktop — has
-  // no Amazon IAP available.
+export function isNativeAndroidBuild() {
+  // The Google Play edition is the only native target we ship. Anything else —
+  // browser preview, desktop — has no Play Billing available.
   try {
     return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
   } catch {
@@ -65,27 +64,26 @@ let configured = false;
 let configuring = null;
 
 export async function configureRevenueCat() {
-  if (!isNativeAmazonBuild() || configured) return;
+  if (!isNativeAndroidBuild() || configured) return;
   // Several call sites (useAccess mount, purchase, restore) can race; configure
   // exactly once, otherwise the SDK throws "already configured".
   if (configuring) return configuring;
 
-  const apiKey = process.env.REACT_APP_REVENUECAT_AMAZON_PUBLIC_KEY;
+  const apiKey = process.env.REACT_APP_REVENUECAT_GOOGLE_PUBLIC_KEY;
   if (!apiKey) {
     console.warn(
-      "RevenueCat Amazon SDK key missing (REACT_APP_REVENUECAT_AMAZON_PUBLIC_KEY)"
+      "RevenueCat Google SDK key missing (REACT_APP_REVENUECAT_GOOGLE_PUBLIC_KEY)"
     );
     return;
   }
 
   configuring = (async () => {
     await Purchases.setLogLevel({ level: LOG_LEVEL.WARN });
-    // useAmazon:true routes every purchase through Amazon In-App Purchasing.
-    // Google Play Billing is never initialised in this build.
+    // Google Play Billing is RevenueCat's default store on Android; no
+    // store flag is needed.
     await Purchases.configure({
       apiKey,
       appUserID: getAppUserId(),
-      useAmazon: true,
     });
     configured = true;
   })();
@@ -99,7 +97,7 @@ export async function configureRevenueCat() {
 
 // Returns true if the "premium" entitlement is active on the current device.
 export async function isPremiumActive() {
-  if (!isNativeAmazonBuild()) return false;
+  if (!isNativeAndroidBuild()) return false;
   try {
     if (!configured) await configureRevenueCat();
     const { customerInfo } = await Purchases.getCustomerInfo();
@@ -115,20 +113,25 @@ async function getMonthlyPackage() {
   const offerings = await Purchases.getOfferings();
   const current = offerings?.current;
   if (!current) throw new Error("No RevenueCat offering configured.");
+  // Play subscription products are identified as "<subscriptionId>:<basePlanId>".
   const pkg =
     current.monthly ||
-    current.availablePackages?.find(
-      (p) => p.product?.identifier === AMAZON_MONTHLY_SKU
-    );
+    current.availablePackages?.find((p) => {
+      const id = p.product?.identifier || "";
+      return (
+        id === GOOGLE_PLAY_MONTHLY_SUBSCRIPTION_ID ||
+        id.startsWith(`${GOOGLE_PLAY_MONTHLY_SUBSCRIPTION_ID}:`)
+      );
+    });
   if (!pkg) throw new Error("Monthly package not found in current offering.");
   return pkg;
 }
 
-// Invokes the native Amazon purchase sheet via RevenueCat.
+// Invokes the native Google Play purchase sheet via RevenueCat.
 export async function subscribeMonthly() {
-  if (!isNativeAmazonBuild()) {
+  if (!isNativeAndroidBuild()) {
     throw new Error(
-      "In-app purchases are only available in the Wisdom & Word Amazon Appstore edition."
+      "In-app purchases are only available in the Wisdom & Word Google Play edition."
     );
   }
   if (!configured) await configureRevenueCat();
@@ -140,9 +143,9 @@ export async function subscribeMonthly() {
 }
 
 export async function restorePurchases() {
-  if (!isNativeAmazonBuild()) {
+  if (!isNativeAndroidBuild()) {
     throw new Error(
-      "Purchases can only be restored inside the Wisdom & Word Amazon Appstore edition."
+      "Purchases can only be restored inside the Wisdom & Word Google Play edition."
     );
   }
   if (!configured) await configureRevenueCat();

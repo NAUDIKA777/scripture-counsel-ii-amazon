@@ -1,6 +1,6 @@
-name: Build Amazon Appstore AAB
+name: Build Google Play AAB
 
-# Builds a signed release AAB (Android App Bundle) ready for Amazon Appstore submission.
+# Builds a signed release AAB (Android App Bundle) ready for Google Play submission.
 #
 # Trigger:
 #   - Push to main
@@ -8,16 +8,15 @@ name: Build Amazon Appstore AAB
 #   - Tag matching v* → also attaches the AAB to a GitHub Release
 #
 # Required repository secrets (Settings → Secrets and variables → Actions):
-#   APPSTORE_AUTHENTICATION_KEY_PEM_B64 — base64 of AppstoreAuthenticationKey.pem
-#   ANDROID_KEYSTORE_B64                — base64 of your release keystore file
+#   ANDROID_KEYSTORE_B64                — base64 of your release (upload) keystore file
 #   ANDROID_KEYSTORE_PASSWORD           — keystore password
 #   ANDROID_KEY_ALIAS                   — key alias inside the keystore
 #   ANDROID_KEY_PASSWORD                — key password
-#   REVENUECAT_AMAZON_PUBLIC_KEY        — amzn_... (mirrors frontend/.env)
+#   REVENUECAT_GOOGLE_PUBLIC_KEY        — goog_... (mirrors frontend/.env)
 #
-# Encode files to base64 (macOS/Linux):
-#   base64 -i AppstoreAuthenticationKey.pem | pbcopy       # macOS
-#   base64 -w0 AppstoreAuthenticationKey.pem | xclip -sel  # Linux
+# Encode the keystore to base64 (macOS/Linux):
+#   base64 -i release.keystore | pbcopy        # macOS
+#   base64 -w0 release.keystore | xclip -sel   # Linux
 
 on:
   push:
@@ -62,21 +61,8 @@ jobs:
             echo "WDS_SOCKET_PORT=443"
             echo "ENABLE_HEALTH_CHECK=false"
             echo "REACT_APP_FREE_COUNSEL_LIMIT=1"
-            echo "REACT_APP_REVENUECAT_AMAZON_PUBLIC_KEY=${{ secrets.REVENUECAT_AMAZON_PUBLIC_KEY }}"
+            echo "REACT_APP_REVENUECAT_GOOGLE_PUBLIC_KEY=${{ secrets.REVENUECAT_GOOGLE_PUBLIC_KEY }}"
           } > .env
-
-      - name: Restore Amazon PEM key
-        env:
-          PEM_B64: ${{ secrets.APPSTORE_AUTHENTICATION_KEY_PEM_B64 }}
-        run: |
-          if [ -z "$PEM_B64" ]; then
-            echo "::error::APPSTORE_AUTHENTICATION_KEY_PEM_B64 secret missing"
-            exit 1
-          fi
-          mkdir -p frontend/android/app/src/main/assets
-          echo "$PEM_B64" | base64 -d > frontend/android/app/src/main/assets/AppstoreAuthenticationKey.pem
-          rm -f frontend/android/app/src/main/assets/PLACE_AMAZON_PEM_HERE.txt
-          ls -l frontend/android/app/src/main/assets/AppstoreAuthenticationKey.pem
 
       - name: Restore Android keystore
         env:
@@ -138,6 +124,13 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          # app/build.gradle's own signingConfig reads these (path is relative
+          # to the app module). Without them Gradle emits an unsigned bundle,
+          # which Google Play rejects.
+          WW_KEYSTORE_FILE: release.keystore
+          WW_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          WW_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          WW_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon clean bundleRelease --stacktrace
@@ -148,7 +141,7 @@ jobs:
         run: |
           VERSION=$(grep versionName ../../../../build.gradle | head -1 | awk -F'"' '{print $2}')
           COMMIT_SHORT=$(git -C "${{ github.workspace }}" rev-parse --short HEAD)
-          NAME="wisdomandword-amazon-v${VERSION}-${COMMIT_SHORT}.aab"
+          NAME="wisdomandword-play-v${VERSION}-${COMMIT_SHORT}.aab"
           mv app-release.aab "$NAME"
           ls -lh
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
@@ -158,7 +151,7 @@ jobs:
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wisdomandword-amazon-aab
+          name: wisdomandword-play-aab
           path: ${{ steps.rename.outputs.path }}
           if-no-files-found: error
           retention-days: 30

@@ -16,7 +16,7 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    // Release signing for the Amazon Appstore upload. Credentials are never
+    // Release signing for the Google Play upload. Credentials are never
     // committed: set them in ~/.gradle/gradle.properties (or as environment
     // variables) before running ./gradlew assembleRelease. If they are absent
     // the build still succeeds and produces an unsigned APK.
@@ -60,17 +60,12 @@ dependencies {
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
 
-    // Amazon Appstore billing backend for RevenueCat.
-    // Version tracks the base 'purchases' artifact that
-    // purchases-hybrid-common (bundled with @revenuecat/purchases-capacitor)
-    // resolves transitively. If your local Gradle prints a "Runtime classpath
-    // has conflicting versions" warning, bump both artifacts to the version
-    // reported by hybrid-common's transitive dependency.
-    implementation "com.revenuecat.purchases:purchases-store-amazon:10.15.1"
+    // Google Play Billing for RevenueCat ships with the base 'purchases'
+    // artifact pulled in by @revenuecat/purchases-capacitor, including the
+    // com.android.vending.BILLING permission via manifest merge. No extra
+    // store module is needed.
 }
 
 apply from: 'capacitor.build.gradle'
 
-// Amazon Appstore edition: no google-services.json / Firebase plugin is applied.
-// Fire OS devices ship without Google Play Services, so nothing here may depend
-// on it.
+// Google Play edition: no google-services.json / Firebase plugin is applied.

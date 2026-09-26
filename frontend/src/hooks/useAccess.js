@@ -8,12 +8,12 @@ import {
 } from "@/lib/revenuecat";
 
 /**
- * Access gate for the Amazon Appstore build.
+ * Access gate for the Google Play build.
  * - 1 free counsel (trial) tracked locally in localStorage.
- * - "Pro" entitlement comes from RevenueCat CustomerInfo (Amazon store) —
+ * - "Pro" entitlement comes from RevenueCat CustomerInfo (Google Play) —
  *   authoritative on device, refreshed on mount and on demand.
  * - In a plain web browser (no Capacitor), isPro will always be false;
- *   the paywall messaging directs the user to the Amazon build.
+ *   the paywall messaging directs the user to the Google Play build.
  */
 export function useAccess() {
   const [isPro, setIsPro] = useState(false);

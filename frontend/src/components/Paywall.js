@@ -13,7 +13,7 @@ import {
 import {
   subscribeMonthly,
   restorePurchases,
-  isNativeAmazonBuild,
+  isNativeAndroidBuild,
 } from "@/lib/revenuecat";
 import { useHardwareBackDismiss } from "@/hooks/useHardwareBackDismiss";
 
@@ -28,17 +28,17 @@ export default function Paywall({ open, onClose, onUnlock, reason }) {
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
 
-  // Hardware back closes the paywall instead of exiting the app (Fire OS).
+  // Hardware back closes the paywall instead of exiting the app.
   useHardwareBackDismiss(open && !purchasing, onClose);
 
   if (!open) return null;
 
-  const native = isNativeAmazonBuild();
+  const native = isNativeAndroidBuild();
 
   const handleSubscribe = async () => {
     if (!native) {
       toast.error(
-        "In-app purchases are only available in the Amazon Appstore edition of Wisdom & Word."
+        "In-app purchases are only available in the Google Play edition of Wisdom & Word."
       );
       return;
     }
@@ -55,7 +55,7 @@ export default function Paywall({ open, onClose, onUnlock, reason }) {
       }
     } catch (e) {
       // RevenueCat throws { code: "PURCHASE_CANCELLED" } when the user dismisses
-      // the Amazon dialog — no toast needed for that case.
+      // the Google Play sheet — no toast needed for that case.
       const code = e?.code || e?.userCancelled;
       if (code !== "PURCHASE_CANCELLED" && code !== true) {
         toast.error(e?.message || "Purchase could not be completed.");
@@ -68,7 +68,7 @@ export default function Paywall({ open, onClose, onUnlock, reason }) {
   const handleRestore = async () => {
     if (!native) {
       toast.error(
-        "Purchases can only be restored inside the Amazon Appstore edition of Wisdom & Word."
+        "Purchases can only be restored inside the Google Play edition of Wisdom & Word."
       );
       return;
     }
@@ -79,7 +79,7 @@ export default function Paywall({ open, onClose, onUnlock, reason }) {
         toast.success("Access restored. Welcome back.");
         onUnlock?.();
       } else {
-        toast.error("No active premium purchase was found for this Amazon account.");
+        toast.error("No active premium purchase was found for this Google account.");
       }
     } catch (e) {
       toast.error(e?.message || "Restore failed. Please try again.");
@@ -155,7 +155,7 @@ export default function Paywall({ open, onClose, onUnlock, reason }) {
               $4.99<span className="text-lg text-slate-400 ml-1">/month</span>
             </div>
             <div className="text-xs uppercase tracking-widest text-slate-400 mt-1">
-              Auto-renewing subscription · Charged to your Amazon account
+              Auto-renewing subscription · Billed through Google Play
             </div>
           </div>
           <Check className="w-5 h-5" style={{ color: "var(--gold)" }} strokeWidth={2} />
@@ -171,11 +171,11 @@ export default function Paywall({ open, onClose, onUnlock, reason }) {
           {purchasing ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2} />
-              <span className="uppercase tracking-widest text-sm">Opening Amazon…</span>
+              <span className="uppercase tracking-widest text-sm">Opening Google Play…</span>
             </>
           ) : (
             <span className="uppercase tracking-widest text-sm">
-              Subscribe via Amazon · $4.99 / month
+              Subscribe via Google Play · $4.99 / month
             </span>
           )}
         </button>
@@ -197,10 +197,10 @@ export default function Paywall({ open, onClose, onUnlock, reason }) {
         </button>
 
         <p className="mt-5 text-[11px] leading-relaxed text-slate-400">
-          Payment is charged to your Amazon account. The subscription renews
-          automatically every month at $4.99 unless you cancel at least 24
-          hours before the end of the current period. Manage or cancel any time
-          from <span className="text-slate-300">Your Amazon → Memberships &amp; Subscriptions</span>.
+          Payment is charged to your Google Play account. The subscription
+          renews automatically every month at $4.99 unless you cancel before
+          the end of the current period. Manage or cancel any time from{" "}
+          <span className="text-slate-300">Google Play → Payments &amp; subscriptions → Subscriptions</span>.
         </p>
 
         {!native && (
@@ -208,7 +208,7 @@ export default function Paywall({ open, onClose, onUnlock, reason }) {
             className="mt-4 text-[11px] uppercase tracking-widest text-amber-200/70 text-center"
             data-testid="paywall-web-notice"
           >
-            Preview mode · install the Amazon Appstore edition to subscribe
+            Preview mode · install the Google Play edition to subscribe
           </p>
         )}
       </div>

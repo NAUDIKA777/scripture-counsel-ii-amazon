@@ -26,19 +26,6 @@
 
         </activity>
 
-        <!-- Amazon In-App Purchasing response receiver.
-             RevenueCat's Amazon store module normally injects this via
-             manifest merger; declared explicitly here so it is guaranteed
-             present in Amazon App Tester and Live App Testing. -->
-        <receiver
-            android:name="com.amazon.device.iap.ResponseReceiver"
-            android:exported="true"
-            android:permission="com.amazon.inapp.purchasing.Permission.NOTIFY">
-            <intent-filter>
-                <action android:name="com.amazon.inapp.purchasing.NOTIFY" />
-            </intent-filter>
-        </receiver>
-
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -55,9 +42,9 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- Amazon Appstore device targeting: Fire tablets and Fire TV must not be
-         filtered out because of hardware this app never uses. Everything is
-         optional; the app only needs a network connection. -->
+    <!-- Device targeting: tablets and other devices must not be filtered out
+         because of hardware this app never uses. Everything is optional; the
+         app only needs a network connection. -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.hardware.faketouch" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
@@ -67,11 +54,4 @@
     <uses-feature android:name="android.hardware.location" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <uses-feature android:name="android.hardware.wifi" android:required="false" />
-
-    <!-- Android 11+ package visibility so the app can detect the Amazon Appstore
-         client (Venezia) and the App Tester when running IAP flows. -->
-    <queries>
-        <package android:name="com.amazon.venezia" />
-        <package android:name="com.amazon.sdktestclient" />
-    </queries>
 </manifest>
