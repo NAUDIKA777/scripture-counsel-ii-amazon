@@ -9,7 +9,7 @@ import {
 
 /**
  * Access gate for the Amazon Appstore build.
- * - 3 free counsels tracked locally in localStorage.
+ * - 1 free counsel (trial) tracked locally in localStorage.
  * - "Pro" entitlement comes from RevenueCat CustomerInfo (Amazon store) —
  *   authoritative on device, refreshed on mount and on demand.
  * - In a plain web browser (no Capacitor), isPro will always be false;

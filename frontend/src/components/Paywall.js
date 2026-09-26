@@ -115,7 +115,7 @@ export default function Paywall({ open, onClose, onUnlock, reason }) {
           className="text-[10px] uppercase tracking-[0.4em] mb-3"
           style={{ color: "var(--gold)" }}
         >
-          {reason === "limit" ? "Free counsels received" : "Continue with the Elder"}
+          {reason === "limit" ? "Free counsel received" : "Continue with the Elder"}
         </div>
         <h2 className="font-serif text-4xl md:text-5xl leading-tight text-slate-50">
           Walk further<br />

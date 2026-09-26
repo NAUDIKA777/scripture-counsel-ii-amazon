@@ -61,7 +61,7 @@ jobs:
             echo "REACT_APP_BACKEND_URL=${{ vars.REACT_APP_BACKEND_URL || 'https://scripture-counsel-2.preview.emergentagent.com' }}"
             echo "WDS_SOCKET_PORT=443"
             echo "ENABLE_HEALTH_CHECK=false"
-            echo "REACT_APP_FREE_COUNSEL_LIMIT=3"
+            echo "REACT_APP_FREE_COUNSEL_LIMIT=1"
             echo "REACT_APP_REVENUECAT_AMAZON_PUBLIC_KEY=${{ secrets.REVENUECAT_AMAZON_PUBLIC_KEY }}"
           } > .env
 

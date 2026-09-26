@@ -64,7 +64,7 @@ export default class ErrorBoundary extends React.Component {
           </h1>
           <p className="mt-4 text-slate-300 leading-relaxed text-sm">
             The reflection could not be displayed. Reload to continue —
-            your free counsels and session are preserved.
+            your free counsel and session are preserved.
           </p>
           <button
             type="button"

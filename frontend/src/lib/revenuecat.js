@@ -22,7 +22,7 @@ const APP_USER_ID_KEY = "wisdom_user_id";
 const FREE_COUNT_KEY = "wisdom_free_counsel_count";
 
 export const FREE_LIMIT = parseInt(
-  process.env.REACT_APP_FREE_COUNSEL_LIMIT || "3",
+  process.env.REACT_APP_FREE_COUNSEL_LIMIT || "1",
   10
 );
 

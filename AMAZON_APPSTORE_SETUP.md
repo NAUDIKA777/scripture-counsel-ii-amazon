@@ -98,7 +98,7 @@ Same procedure as before:
    ```
 
 3. Install the debug APK (`./gradlew assembleDebug`) on the device.
-4. Exhaust 3 free counsels → tap **Subscribe via Amazon** → confirm the mocked
+4. Use the 1 free counsel → tap **Subscribe via Amazon** → confirm the mocked
    purchase → verify the *Premium* pill appears in the nav.
 5. Kill and relaunch → premium should still be active.
 6. Tap **Restore Purchases** → should restore.
@@ -123,7 +123,7 @@ Same procedure as before:
 - `frontend/.env.production` is committed and is what `yarn build` uses:
   `REACT_APP_BACKEND_URL=https://scripture-counsel-2.emergent.host`,
   `REACT_APP_REVENUECAT_AMAZON_PUBLIC_KEY=amzn_oBFPlvVmUDQAdMgWSmvQOtLECVV`,
-  `REACT_APP_FREE_COUNSEL_LIMIT=3`. If the backend host ever changes, update
+  `REACT_APP_FREE_COUNSEL_LIMIT=1`. If the backend host ever changes, update
   that file **and** `PRODUCTION_BACKEND_URL` in `frontend/src/lib/api.js`
   (the hard fallback used when no env value is present).
 - `backend/.env → REVENUECAT_WEBHOOK_AUTH` is empty. Fill it later with any
