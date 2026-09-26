@@ -1,10 +1,11 @@
-# GitHub Actions — Amazon Appstore APK Build
+# GitHub Actions — Amazon Appstore AAB Build
 
-This workflow builds a **signed Amazon Appstore release APK** on every push
-to `main` (and on manual dispatch and on `v*` tags). You never need to install
-Java or the Android SDK locally — GitHub's ubuntu-latest runners handle it.
+This workflow builds a **signed Amazon Appstore release AAB** (Android App
+Bundle) on every push to `main` (and on manual dispatch and on `v*` tags). You
+never need to install Java or the Android SDK locally — GitHub's ubuntu-latest
+runners handle it.
 
-**Output:** a signed APK named `wisdomandword-amazon-v<ver>-<sha>.apk` attached
+**Output:** a signed AAB named `wisdomandword-amazon-v<ver>-<sha>.aab` attached
 as a workflow artifact (30-day retention) and, for `v*` tag pushes, attached
 to an auto-created GitHub Release.
 
@@ -15,7 +16,7 @@ to an auto-created GitHub Release.
 ### 1. Push this repo to GitHub
 
 Use Emergent's **"Save to GitHub"** button in the chat header. Confirm the repo
-exists and shows the `.github/workflows/build-apk.yml` file.
+exists and shows the `.github/workflows/build-aab.yml` file.
 
 ### 2. Create a release keystore *(one-time — keep this file forever)*
 
@@ -62,13 +63,13 @@ repository secret**. Add these six:
 | `ANDROID_KEY_PASSWORD`                   | key password from step 2                              |
 | `REVENUECAT_AMAZON_PUBLIC_KEY`           | `amzn_oBFPlvVmUDQAdMgWSmvQOtLECVV`                    |
 
-*(Optional)* If you want to override the backend base URL baked into the APK,
+*(Optional)* If you want to override the backend base URL baked into the AAB,
 add a **repository variable** (same UI, "Variables" tab) named
 `REACT_APP_BACKEND_URL` — defaults to `https://scripture-counsel-2.preview.emergentagent.com`.
 
 ---
 
-## Building an APK
+## Building an AAB
 
 ### Option A — automatic on every push to `main`
 
@@ -76,12 +77,12 @@ add a **repository variable** (same UI, "Variables" tab) named
 git add . && git commit -m "…" && git push origin main
 ```
 
-Open the **Actions** tab → the latest "Build Amazon Appstore APK" run →
-**Artifacts** section → download `wisdomandword-amazon-apk`.
+Open the **Actions** tab → the latest "Build Amazon Appstore AAB" run →
+**Artifacts** section → download `wisdomandword-amazon-aab`.
 
 ### Option B — manual dispatch (no code changes needed)
 
-GitHub → **Actions** tab → left sidebar "Build Amazon Appstore APK" →
+GitHub → **Actions** tab → left sidebar "Build Amazon Appstore AAB" →
 **Run workflow** button → choose `main` → **Run workflow**.
 
 ### Option C — versioned release build with GitHub Release attached
@@ -93,9 +94,9 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-The Actions run will build the APK, create a Release named `v1.0.0`, and
-attach the signed APK to it — one-click download from the Releases page,
-which is perfect for handing an APK to Amazon reviewers or testers.
+The Actions run will build the AAB, create a Release named `v1.0.0`, and
+attach the signed AAB to it — one-click download from the Releases page,
+which is perfect for uploading to the Amazon Developer Console.
 
 ---
 
@@ -107,7 +108,7 @@ which is perfect for handing an APK to Amazon reviewers or testers.
 
 ---
 
-## Signing your APK — important reminders
+## Signing your AAB — important reminders
 
 - The keystore used by CI **must be the same keystore** used forever.
   Amazon (and Google Play, and any future store) refuses updates signed by a
@@ -129,15 +130,15 @@ which is perfect for handing an APK to Amazon reviewers or testers.
 - **"Keystore was tampered with, or password was incorrect"** — the base64
   encoding accidentally added newlines. Re-encode with `base64 -w0` (Linux)
   or `openssl base64 -A` (macOS) and update the secret.
-- **APK builds but Amazon rejects with "Invalid PEM"** — you re-downloaded a
+- **AAB builds but Amazon rejects with "Invalid PEM"** — you re-downloaded a
   new PEM from Amazon and forgot to update `APPSTORE_AUTHENTICATION_KEY_PEM_B64`.
-  Amazon rotates a fresh PEM whenever you re-upload the APK to a new draft.
+  Amazon rotates a fresh PEM whenever you re-upload the app file to a new draft.
 
 ---
 
 ## Files
 
-- `.github/workflows/build-apk.yml` — the workflow definition
+- `.github/workflows/build-aab.yml` — the workflow definition
 - `frontend/android/` — the Capacitor Android project (auto-generated,
   don't hand-edit files outside `app/src/main/AndroidManifest.xml` and
   `app/build.gradle`)

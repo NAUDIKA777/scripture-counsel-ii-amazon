@@ -1,0 +1,172 @@
+name: Build Amazon Appstore AAB
+
+# Builds a signed release AAB (Android App Bundle) ready for Amazon Appstore submission.
+#
+# Trigger:
+#   - Push to main
+#   - Manual dispatch (Actions tab → "Run workflow")
+#   - Tag matching v* → also attaches the AAB to a GitHub Release
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   APPSTORE_AUTHENTICATION_KEY_PEM_B64 — base64 of AppstoreAuthenticationKey.pem
+#   ANDROID_KEYSTORE_B64                — base64 of your release keystore file
+#   ANDROID_KEYSTORE_PASSWORD           — keystore password
+#   ANDROID_KEY_ALIAS                   — key alias inside the keystore
+#   ANDROID_KEY_PASSWORD                — key password
+#   REVENUECAT_AMAZON_PUBLIC_KEY        — amzn_... (mirrors frontend/.env)
+#
+# Encode files to base64 (macOS/Linux):
+#   base64 -i AppstoreAuthenticationKey.pem | pbcopy       # macOS
+#   base64 -w0 AppstoreAuthenticationKey.pem | xclip -sel  # Linux
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & Sign AAB
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      # ---- Write env & secret files --------------------------------------
+      - name: Write frontend/.env
+        working-directory: frontend
+        run: |
+          {
+            echo "REACT_APP_BACKEND_URL=${{ vars.REACT_APP_BACKEND_URL || 'https://scripture-counsel-2.preview.emergentagent.com' }}"
+            echo "WDS_SOCKET_PORT=443"
+            echo "ENABLE_HEALTH_CHECK=false"
+            echo "REACT_APP_FREE_COUNSEL_LIMIT=3"
+            echo "REACT_APP_REVENUECAT_AMAZON_PUBLIC_KEY=${{ secrets.REVENUECAT_AMAZON_PUBLIC_KEY }}"
+          } > .env
+
+      - name: Restore Amazon PEM key
+        env:
+          PEM_B64: ${{ secrets.APPSTORE_AUTHENTICATION_KEY_PEM_B64 }}
+        run: |
+          if [ -z "$PEM_B64" ]; then
+            echo "::error::APPSTORE_AUTHENTICATION_KEY_PEM_B64 secret missing"
+            exit 1
+          fi
+          mkdir -p frontend/android/app/src/main/assets
+          echo "$PEM_B64" | base64 -d > frontend/android/app/src/main/assets/AppstoreAuthenticationKey.pem
+          rm -f frontend/android/app/src/main/assets/PLACE_AMAZON_PEM_HERE.txt
+          ls -l frontend/android/app/src/main/assets/AppstoreAuthenticationKey.pem
+
+      - name: Restore Android keystore
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KS_B64" ]; then
+            echo "::error::ANDROID_KEYSTORE_B64 secret missing"
+            exit 1
+          fi
+          echo "$KS_B64" | base64 -d > frontend/android/app/release.keystore
+
+      # ---- Build web bundle & sync into android/ -------------------------
+      - name: Install web deps
+        working-directory: frontend
+        run: yarn install --frozen-lockfile
+
+      - name: Build web
+        working-directory: frontend
+        run: yarn build
+
+      - name: Capacitor sync
+        working-directory: frontend
+        run: npx cap sync android
+
+      # ---- Configure signing & build --------------------------------------
+      - name: Inject signing config
+        working-directory: frontend/android/app
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("build.gradle")
+          text = p.read_text()
+          if "signingConfigs {" in text:
+              print("signing config already present")
+          else:
+              signing = (
+                  "    signingConfigs {\n"
+                  "        release {\n"
+                  "            storeFile file(\"release.keystore\")\n"
+                  "            storePassword System.getenv(\"ANDROID_KEYSTORE_PASSWORD\")\n"
+                  "            keyAlias System.getenv(\"ANDROID_KEY_ALIAS\")\n"
+                  "            keyPassword System.getenv(\"ANDROID_KEY_PASSWORD\")\n"
+                  "        }\n"
+                  "    }\n"
+              )
+              text = text.replace("    buildTypes {", signing + "    buildTypes {")
+              text = text.replace(
+                  "release {\n            minifyEnabled false",
+                  "release {\n            signingConfig signingConfigs.release\n            minifyEnabled false",
+              )
+              p.write_text(text)
+              print("signing config injected")
+          PY
+          grep -n "signingConfig" build.gradle | head -5
+
+      - name: Build release AAB
+        working-directory: frontend/android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon clean bundleRelease --stacktrace
+
+      - name: Rename AAB
+        id: rename
+        working-directory: frontend/android/app/build/outputs/bundle/release
+        run: |
+          VERSION=$(grep versionName ../../../../build.gradle | head -1 | awk -F'"' '{print $2}')
+          COMMIT_SHORT=$(git -C "${{ github.workspace }}" rev-parse --short HEAD)
+          NAME="wisdomandword-amazon-v${VERSION}-${COMMIT_SHORT}.aab"
+          mv app-release.aab "$NAME"
+          ls -lh
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "path=frontend/android/app/build/outputs/bundle/release/$NAME" >> "$GITHUB_OUTPUT"
+
+      # ---- Publish -------------------------------------------------------
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wisdomandword-amazon-aab
+          path: ${{ steps.rename.outputs.path }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach AAB to Release (tag builds only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.rename.outputs.path }}
+          fail_on_unmatched_files: true
+          generate_release_notes: true
