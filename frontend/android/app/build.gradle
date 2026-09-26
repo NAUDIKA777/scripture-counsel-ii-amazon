@@ -36,8 +36,10 @@ android {
             if (project.findProperty('WW_KEYSTORE_FILE') ?: System.getenv('WW_KEYSTORE_FILE')) {
                 signingConfig signingConfigs.release
             }
+            // R8 shrinking stays off: RevenueCat's Kotlin metadata tripped R8 in CI.
+            // Release APKs are always zip-aligned, so no zipAlignEnabled is needed.
             minifyEnabled false
-            zipAlignEnabled true
+            shrinkResources false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
